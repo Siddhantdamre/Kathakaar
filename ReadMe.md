@@ -1,88 +1,73 @@
-# Smart Cultural Storyteller 
+# Kathakaar - Cultural AI Storytelling Studio
 
-**An Agentic Geospatial Narrative Engine**
+[![Live Demo](https://img.shields.io/badge/Live_Demo-open-2DA44E?style=for-the-badge&logo=githubpages)](https://siddhantdamre.github.io/Kathakaar/)
+[![Portfolio Guide](https://img.shields.io/badge/Portfolio-context-0969DA?style=for-the-badge&logo=github)](https://github.com/Siddhantdamre/Siddhantdamre/blob/main/PORTFOLIO.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-This project is an interactive, map-based AI system that transforms static geographical coordinates into immersive cultural narratives. It uses a **Hybrid Agentic Architecture** combining real-time Wikipedia data, Generative AI, and Web Search to research, narrate, and visualize local folklore.
+Kathakaar is an agentic cultural storytelling prototype that turns a place into a grounded narrative experience. It combines geospatial context, Wikipedia-style factual grounding, web search, LLM narration, map visualization, and text-to-speech to help users explore local folklore and heritage.
 
----
+## Recruiter Quick Look
 
-##  Quick Start Guide
+| What to check | Why it matters |
+| --- | --- |
+| [Live surface](https://siddhantdamre.github.io/Kathakaar/) | A clickable project overview before cloning the repo. |
+| `Project_Walkthrough.ipynb` | End-to-end build path and experiment notes. |
+| `sandpaper.py` | Core prototype logic for the storytelling pipeline. |
+| `finalprojectsubmission.ipynb` | Submission-ready notebook and implementation trail. |
 
-### 1. Prerequisites
-Ensure you have **Python 3.8+** installed.
+## Problem
 
-### 2. Installation
-Open your terminal or command prompt in the project folder and run the following command to install all dependencies:
+Cultural knowledge is often scattered across static text, map entries, and disconnected search results. Kathakaar explores how an AI agent can stitch those fragments into a more memorable educational experience: place-aware, source-grounded, visual, and narrated.
+
+## What It Does
+
+- Accepts a location or cultural place of interest.
+- Retrieves grounding context from public knowledge sources.
+- Generates a narrative that is shaped by the place rather than generic prompting.
+- Uses map and visual context to make the story explorable.
+- Adds voice/narration direction so the output feels closer to an interactive cultural guide.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    A[User location or place] --> B[Geocoding and place context]
+    B --> C[Knowledge retrieval]
+    C --> D[Narrative planning]
+    D --> E[LLM story generation]
+    E --> F[Map and visual surface]
+    E --> G[Voice narration path]
+```
+
+## Tech Stack
+
+`Python` `Jupyter` `FastAPI` `Wikipedia API` `DuckDuckGo Search` `Edge TTS` `Geospatial Data` `Narrative Generation`
+
+## Run Locally
+
+Install the main dependencies:
 
 ```bash
 pip install fastapi uvicorn requests wikipedia-api duckduckgo-search edge-tts geopy pandas
+```
 
-Note: If you are running this inside a Jupyter environment (like Anaconda or Colab), you can run !pip install ... in the first cell of the notebook.
+Run the notebook workflow from top to bottom. The notebook generates the app files and starts the local FastAPI server. Open the local URL shown by the notebook, usually:
 
-3. How to Run (Step-by-Step)
-This project is contained entirely within the Jupyter Notebook (.ipynb). The notebook acts as a "Builder" that automatically creates the necessary system files and launches the server.
+```text
+http://localhost:8001
+```
 
-Open the Notebook: Launch your Jupyter Notebook file (e.g., submission.ipynb).
+## Current Demo State
 
-Run All Cells: Execute the cells from top to bottom.
+The GitHub Pages surface gives reviewers a quick overview of the product concept and technical direction. The next step is a hosted Gradio or Hugging Face Spaces demo where users can enter a place and receive a generated grounded story plus sample narration.
 
-File Creation: The initial cells use %%writefile to automatically generate the core/ folder, agent.py, main.py, and index.html.
+## Roadmap
 
-Server Launch: The final cell starts the uvicorn server.
+- Add a hosted interactive story generation demo.
+- Add 3-5 curated sample locations with before/after outputs.
+- Add citations or source snippets beside every generated narrative.
+- Add voice samples and a short screen recording to the README.
 
-Access the Dashboard:
+## License
 
-Once the server starts, you will see a URL in the output (usually http://127.0.0.1:8001).
-
-Open your web browser and go to: http://localhost:8001
-
-📂 Project Structure
-When you execute the notebook, it automatically generates this architecture on your disk:
-
-Plaintext
-
-📂 Project Root
-├── 📄 submission.ipynb       # The Main Source of Truth (Run this)
-├── 📄 README.md              # This file
-├── 📄 main.py                # FastAPI Server Entrypoint
-├── 📄 index.html             # Frontend Dashboard (MapLibre + Charts)
-└── 📂 core/                  # AI Logic Module
-    ├── 📄 agent.py           # The "Brain" (Wikipedia + LLM + Search)
-    ├── 📄 narrative.py       # Narrative Planning Logic
-    ├── 📄 data_service.py    # Geocoding & Cultural Data
-    └── 📄 cultural_intelligence_builder.py
- Architecture & Features
-Frontend: MapLibre GL JS (Interactive Map), Chart.js (Cultural Radar).
-
-Backend: FastAPI (High-performance Python server).
-
-The "Agent" (core/agent.py):
-
-Grounding: Fetches real history via Wikipedia-API.
-
-Storytelling: Uses Cloud LLM (Pollinations.ai) to generate folklore based on facts.
-
-Visualization: Uses DuckDuckGo Search to find real historical images (preventing AI hallucinations).
-
-Voice: Uses Edge-TTS for neural voice narration.
-
-  Troubleshooting
-"Address already in use" Error:
-
-If you restart the kernel, the old server might still be holding Port 8001.
-
-Fix: Restart your kernel (Kernel -> Restart) or change the port in the final command (e.g., port=8002).
-
-Map Not Loading:
-
-Ensure you have an active internet connection (Map tiles and Search require internet).
-
-Image Search Failed:
-
-If images don't appear, the system falls back to a placeholder. This can happen if the search engine rate-limits your IP. Wait 1 minute and try again.
-
-Team / Author
-Project: Smart Cultural Storyteller
-
-
-Track: Generative AI / Education & Cultural Heritage
+MIT
