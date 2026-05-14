@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kathakaar Cultural AI Studio</title>
+  <style>
+    :root { --accent: #bf3989; --ink: #1f2328; --muted: #59636e; --bg: #f6f8fa; --line: #d0d7de; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); }
+    header { padding: 56px 24px 40px; background: linear-gradient(135deg, #ffffff 0%, #eef4ff 100%); border-bottom: 1px solid var(--line); }
+    main { max-width: 1040px; margin: 0 auto; padding: 28px 20px 56px; }
+    .hero { max-width: 1040px; margin: 0 auto; }
+    .eyebrow { color: var(--accent); font-weight: 700; letter-spacing: 0; text-transform: uppercase; font-size: 13px; }
+    h1 { font-size: clamp(34px, 7vw, 72px); line-height: 0.95; margin: 10px 0 18px; letter-spacing: 0; }
+    .tagline { max-width: 760px; color: var(--muted); font-size: 20px; line-height: 1.5; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+    a.button { color: #fff; background: var(--accent); padding: 12px 16px; text-decoration: none; border-radius: 8px; font-weight: 700; }
+    a.secondary { color: var(--accent); background: #fff; border: 1px solid var(--line); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    section, .widget { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+    section h2, .widget h2 { margin: 0 0 10px; font-size: 20px; }
+    section p, .widget p { color: var(--muted); line-height: 1.55; }
+    .widget { margin-top: 18px; }
+    .score-grid, .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+    button, input, select { font: inherit; }
+    button { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 8px; padding: 11px; cursor: pointer; }
+    input, select { width: 100%; margin: 8px 0 16px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--line); }
+    .cards div { border: 1px solid var(--line); border-radius: 8px; padding: 16px; background: #f6f8fa; font-weight: 700; }
+    .artifact { position: relative; height: 240px; border-radius: 8px; background: radial-gradient(circle at center, #fff, #eef4ff); border: 1px solid var(--line); overflow: hidden; }
+    .artifact span { position: absolute; width: 120px; height: 92px; border: 3px solid var(--accent); border-radius: 42% 58% 46% 54%; opacity: .82; }
+    .artifact span:nth-child(1) { left: 28%; top: 34%; transform: rotate(-12deg); }
+    .artifact span:nth-child(2) { left: 42%; top: 28%; transform: rotate(21deg); }
+    .artifact span:nth-child(3) { left: 36%; top: 48%; transform: rotate(6deg); }
+    pre { overflow: auto; background: #0d1117; color: #e6edf3; padding: 16px; border-radius: 8px; }
+    .terminal { background: #0d1117; color: #7ee787; }
+    .terminal p { color: #7ee787; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    footer { color: var(--muted); font-size: 13px; margin-top: 28px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="hero">
+      <div class="eyebrow">Live project surface</div>
+      <h1>Kathakaar Cultural AI Studio</h1>
+      <p class="tagline">Grounded folklore storytelling with RAG, local/cloud LLMs, cinematic generation, and voiceover.</p>
+      <div class="actions">
+        <a class="button" href="https://github.com/Siddhantdamre/Kathakaar">View repository</a>
+        <a class="button secondary" href="https://github.com/Siddhantdamre">GitHub profile</a>
+      </div>
+    </div>
+  </header>
+  <main>
+    <div class="grid"><section><h2>Novelty</h2><p>Positions generative storytelling around cultural grounding, source context, and multilingual narration.</p></section>
+<section><h2>Demo</h2><p>Select a theme to preview the kind of grounded story output the full system should generate.</p></section>
+<section><h2>Next Upgrade</h2><p>Deploy a Gradio app with source citations, generated narration, and sample videos.</p></section></div>
+    
+        <div class="widget"><h2>Story Preview</h2><select id="theme"><option>Coastal legend</option><option>Temple craft</option><option>Forest memory</option></select><p id="widget-output"></p></div>
+        <script>
+          const stories={'Coastal legend':'A fisher hears an old tide-song and follows it to recover the village map.', 'Temple craft':'A young sculptor learns that every broken pattern preserves a route home.', 'Forest memory':'A storyteller follows bird calls to rebuild a forgotten festival.'};
+          function update(){widgetOutput.textContent=stories[theme.value]} const widgetOutput=document.getElementById('widget-output'); theme.onchange=update; update();
+        </script>
+    <footer>Generated demo surface on 2026-05-14. Replace this with the full deployed app as the project matures.</footer>
+  </main>
+</body>
+</html>
