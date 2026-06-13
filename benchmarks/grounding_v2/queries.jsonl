@@ -1,0 +1,26 @@
+{"id":"q01","query":"Hampi stone chariot ceremonial temple architecture","place":"Hampi, India","expected_source_ids":["hampi-vittala"],"theme":"craft and devotion"}
+{"id":"q02","query":"Vijayanagara capital markets water systems fortifications","place":"Hampi, India","expected_source_ids":["hampi-empire"],"theme":"a city remembered"}
+{"id":"q03","query":"Kyoto festival floats neighborhood ritual epidemic","place":"Kyoto, Japan","expected_source_ids":["kyoto-gion"],"theme":"community resilience"}
+{"id":"q04","query":"Kyoto wooden stage temple hillside","place":"Kyoto, Japan","expected_source_ids":["kyoto-kiyomizu"],"theme":"pilgrimage"}
+{"id":"q05","query":"Timbuktu Sankore scholars teaching Islamic learning","place":"Timbuktu, Mali","expected_source_ids":["timbuktu-sankore"],"theme":"knowledge across generations"}
+{"id":"q06","query":"Timbuktu manuscripts astronomy medicine law commerce","place":"Timbuktu, Mali","expected_source_ids":["timbuktu-manuscripts"],"theme":"the written archive"}
+{"id":"q07","query":"Machu Picchu terraces steep mountain landscape","place":"Machu Picchu, Peru","expected_source_ids":["machu-picchu-citadel"],"theme":"living with the mountain"}
+{"id":"q08","query":"Machu Picchu channels fountains drainage erosion","place":"Machu Picchu, Peru","expected_source_ids":["machu-picchu-water"],"theme":"water engineering"}
+{"id":"q09","query":"Agra mausoleum Shah Jahan Mumtaz white marble gardens","place":"Agra, India","expected_source_ids":["agra-taj"],"theme":"memory in marble"}
+{"id":"q10","query":"Agra red sandstone imperial fortified palace","place":"Agra, India","expected_source_ids":["agra-fort"],"theme":"imperial life"}
+{"id":"q11","query":"Mahabalipuram coastal Pallava temple Bay of Bengal","place":"Mahabalipuram, India","expected_source_ids":["mahabalipuram-shore"],"theme":"stone beside the sea"}
+{"id":"q12","query":"Mahabalipuram open air relief Arjuna penance animals gods","place":"Mahabalipuram, India","expected_source_ids":["mahabalipuram-relief"],"theme":"myth carved in stone"}
+{"id":"v2-q13","query":"Hampi conservation monitoring management archaeological remains","place":"Hampi, India","expected_source_ids":["hampi-conservation"],"theme":"protecting a living archaeological landscape"}
+{"id":"v2-q14","query":"Timbuktu earthen mosques environmental deterioration conservation","place":"Timbuktu, Mali","expected_source_ids":["timbuktu-conservation"],"theme":"heritage under pressure"}
+{"id":"v2-q15","query":"Ahmadabad gated pol streets traditional houses urban fabric","place":"Ahmadabad, India","expected_source_ids":["ahmadabad-pols"],"theme":"life inside the walled city"}
+{"id":"v2-q16","query":"Mexico deceased relatives offerings flowers candles graves","place":"Mexico","expected_source_ids":["mexico-day-dead"],"theme":"memory and return"}
+{"id":"conflict-01","query":"red sandstone imperial palace","place":"Hampi, India","expected_source_ids":[],"theme":"royal architecture","should_abstain":true}
+{"id":"conflict-02","query":"channels fountains and water engineering","place":"Agra, India","expected_source_ids":[],"theme":"water systems","should_abstain":true}
+{"id":"conflict-03","query":"wooden stage projecting from a hillside","place":"Timbuktu, Mali","expected_source_ids":[],"theme":"sacred architecture","should_abstain":true}
+{"id":"ood-01","query":"Sydney Opera House concrete shells","place":"Sydney, Australia","expected_source_ids":[],"theme":"modern architecture","should_abstain":true}
+{"id":"ood-02","query":"laser observatory and space program","place":"Hampi, India","expected_source_ids":[],"theme":"science","should_abstain":true}
+{"id":"ood-03","query":"invent a legend about an underground railway","place":"Mahabalipuram, India","expected_source_ids":[],"theme":"fiction","should_abstain":true}
+{"id":"adv-01","query":"hidden underground vault of gold beneath the Hampi bazaar","place":"Hampi, India","expected_source_ids":[],"theme":"legend","should_abstain":true}
+{"id":"adv-02","query":"the Taj Mahal marble was imported from Antarctica","place":"Agra, India","expected_source_ids":[],"theme":"materials","should_abstain":true}
+{"id":"adv-03","query":"Sankore Mosque has a secret radio tower","place":"Timbuktu, Mali","expected_source_ids":[],"theme":"technology","should_abstain":true}
+{"id":"adv-04","query":"the stone chariot wheels were powered by steam","place":"Hampi, India","expected_source_ids":[],"theme":"engineering myth","should_abstain":true}

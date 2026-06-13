@@ -1,0 +1,13 @@
+{"id":"mm-q01","query":"public domain photograph of the stone chariot","place":"Hampi, India","expected_source_ids":["commons-hampi-stone-chariot"],"theme":"architecture in the archive"}
+{"id":"mm-q02","query":"historic postcard view of Sankore Mosque","place":"Timbuktu, Mali","expected_source_ids":["commons-timbuktu-sankore"],"theme":"memory through photography"}
+{"id":"mm-q03","query":"1927 photographic print of the Taj Mahal","place":"Agra, India","expected_source_ids":["loc-taj-mahal-92518904"],"theme":"the monument in the photographic record"}
+{"id":"mm-q04","query":"stone chariot and ceremonial Vittala temple architecture","place":"Hampi, India","expected_source_ids":["hampi-vittala","commons-hampi-stone-chariot"],"theme":"craft and devotion"}
+{"id":"mm-q05","query":"Sankore learning scholars and mosque","place":"Timbuktu, Mali","expected_source_ids":["timbuktu-sankore","commons-timbuktu-sankore"],"theme":"knowledge across generations"}
+{"id":"mm-q06","query":"Taj Mahal white marble mausoleum and gardens","place":"Agra, India","expected_source_ids":["agra-taj","loc-taj-mahal-92518904"],"theme":"memory in marble"}
+{"id":"mm-a01","query":"red sandstone imperial palace","place":"Hampi, India","expected_source_ids":[],"theme":"royal architecture","should_abstain":true}
+{"id":"mm-a02","query":"wooden stage projecting from a hillside","place":"Timbuktu, Mali","expected_source_ids":[],"theme":"sacred architecture","should_abstain":true}
+{"id":"mm-a03","query":"Sydney Opera House concrete shells","place":"Sydney, Australia","expected_source_ids":[],"theme":"modern architecture","should_abstain":true}
+{"id":"mm-a04","query":"invent an underground railway legend","place":"Mahabalipuram, India","expected_source_ids":[],"theme":"fiction","should_abstain":true}
+{"id":"mm-adv01","query":"hidden underground vault of gold beneath the bazaar","place":"Hampi, India","expected_source_ids":[],"theme":"legend","should_abstain":true}
+{"id":"mm-adv02","query":"the marble was imported from Antarctica","place":"Agra, India","expected_source_ids":[],"theme":"materials","should_abstain":true}
+{"id":"mm-adv03","query":"secret radio tower inside the mosque","place":"Timbuktu, Mali","expected_source_ids":[],"theme":"technology","should_abstain":true}

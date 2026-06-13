@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m ruff check src scripts tests
+      - run: python -m mypy src
+      - run: python -m pytest -q
+      - run: python -m kathakaar fit-retriever
+      - run: python -m kathakaar evaluate
+      - run: python scripts/build_grounding_v2.py
+      - run: python -m kathakaar fit-retriever --method hybrid --corpus benchmarks/grounding_v2/corpus.jsonl --output artifacts/hybrid_v2.json
+      - run: python -m kathakaar validate --model artifacts/hybrid_v2.json
+      - run: python scripts/build_knowledge_v3.py
+      - run: python -m kathakaar kb-audit
+      - run: python -m kathakaar fit-multimodal
+      - run: python -m kathakaar validate-multimodal

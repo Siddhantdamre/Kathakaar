@@ -1,0 +1,12 @@
+{"id":"q01","query":"Hampi stone chariot ceremonial temple architecture","place":"Hampi, India","expected_source_ids":["hampi-vittala"],"theme":"craft and devotion"}
+{"id":"q02","query":"Vijayanagara capital markets water systems fortifications","place":"Hampi, India","expected_source_ids":["hampi-empire"],"theme":"a city remembered"}
+{"id":"q03","query":"Kyoto festival floats neighborhood ritual epidemic","place":"Kyoto, Japan","expected_source_ids":["kyoto-gion"],"theme":"community resilience"}
+{"id":"q04","query":"Kyoto wooden stage temple hillside","place":"Kyoto, Japan","expected_source_ids":["kyoto-kiyomizu"],"theme":"pilgrimage"}
+{"id":"q05","query":"Timbuktu Sankore scholars teaching Islamic learning","place":"Timbuktu, Mali","expected_source_ids":["timbuktu-sankore"],"theme":"knowledge across generations"}
+{"id":"q06","query":"Timbuktu manuscripts astronomy medicine law commerce","place":"Timbuktu, Mali","expected_source_ids":["timbuktu-manuscripts"],"theme":"the written archive"}
+{"id":"q07","query":"Machu Picchu terraces steep mountain landscape","place":"Machu Picchu, Peru","expected_source_ids":["machu-picchu-citadel"],"theme":"living with the mountain"}
+{"id":"q08","query":"Machu Picchu channels fountains drainage erosion","place":"Machu Picchu, Peru","expected_source_ids":["machu-picchu-water"],"theme":"water engineering"}
+{"id":"q09","query":"Agra mausoleum Shah Jahan Mumtaz white marble gardens","place":"Agra, India","expected_source_ids":["agra-taj"],"theme":"memory in marble"}
+{"id":"q10","query":"Agra red sandstone imperial fortified palace","place":"Agra, India","expected_source_ids":["agra-fort"],"theme":"imperial life"}
+{"id":"q11","query":"Mahabalipuram coastal Pallava temple Bay of Bengal","place":"Mahabalipuram, India","expected_source_ids":["mahabalipuram-shore"],"theme":"stone beside the sea"}
+{"id":"q12","query":"Mahabalipuram open air relief Arjuna penance animals gods","place":"Mahabalipuram, India","expected_source_ids":["mahabalipuram-relief"],"theme":"myth carved in stone"}
