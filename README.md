@@ -3,10 +3,17 @@
 Provenance-first multimodal cultural retrieval and grounded storytelling.
 
 [![CI](https://github.com/Siddhantdamre/Kathakaar/actions/workflows/ci.yml/badge.svg)](https://github.com/Siddhantdamre/Kathakaar/actions/workflows/ci.yml)
+[![Live Claim Linter](https://img.shields.io/badge/Live_claim_linter-open-5F46A8?style=for-the-badge&logo=githubpages)](https://siddhantdamre.github.io/Kathakaar/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Kathakaar turns a place, topic, or cultural image into a narrative whose
-factual claims remain linked to retrieved evidence. Version 3 adds normalized
+Kathakaar is a provenance-first retrieval and claim-verification system. Its
+[public browser app](https://siddhantdamre.github.io/Kathakaar/) lets an editor
+paste a factual draft plus its allowed sources, then maps each claim to the
+strongest evidence span and flags unsupported numbers, dates, entities, and
+terms before publication. The analysis runs locally in the browser.
+
+The Python research system also turns a place, topic, or cultural image into a
+narrative whose factual claims remain linked to retrieved evidence. Version 3 adds normalized
 knowledge ingestion, rights and attribution auditing, typed image/audio/video
 assets, hybrid text-media retrieval, optional pretrained SigLIP embeddings,
 guarded generative AI, PostgreSQL persistence, and Qdrant vector export.
@@ -19,6 +26,7 @@ invent evidence or silently substitute a source from the wrong place.
 
 | Evidence | What it demonstrates |
 | --- | --- |
+| [Live claim linter](https://siddhantdamre.github.io/Kathakaar/) | A directly usable, private-by-default editorial grounding workflow. |
 | `src/kathakaar/knowledge.py` | LoC, Wikimedia Commons, IIIF, rights, hashes, and validation. |
 | `src/kathakaar/consistency.py` | Auditable claim support gate with explicit unsupported terms. |
 | `src/kathakaar/multimodal.py` | Hybrid text/media retrieval and optional SigLIP inference. |
