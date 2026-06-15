@@ -1,5 +1,17 @@
 # Kathakaar
 
+[![Live demo](https://img.shields.io/badge/Live_demo-storytelling_studio-E8B04B?style=for-the-badge&logo=githubpages)](https://siddhantdamre.github.io/Kathakaar/)
+[![Also: claim linter](https://img.shields.io/badge/also-claim_linter-8B6DFF?style=for-the-badge)](https://siddhantdamre.github.io/Kathakaar/linter.html)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+
+## Quickstart (30s)
+```bash
+make demo        # a source-grounded story with citations + a refusal
+make test        # 32 tests
+cd studio && uvicorn app.main:app   # the web app
+```
+
 Provenance-first multimodal cultural retrieval and grounded storytelling.
 
 [![CI](https://github.com/Siddhantdamre/Kathakaar/actions/workflows/ci.yml/badge.svg)](https://github.com/Siddhantdamre/Kathakaar/actions/workflows/ci.yml)

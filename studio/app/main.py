@@ -1,0 +1,113 @@
+"""Kathakaar Studio API + static frontend (FastAPI)."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from . import genai
+from .grounding import Source
+from .story import StoryEngine
+
+BASE = Path(__file__).resolve().parent.parent
+WEB = BASE / "web"
+
+
+def load_sources(path: Path) -> list[Source]:
+    out: list[Source] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        d = json.loads(line)
+        out.append(Source(d["source_id"], d["title"], d["url"], d["text"], d.get("place", "")))
+    return out
+
+
+SOURCES = load_sources(BASE / "data" / "corpus.jsonl")
+ENGINE = StoryEngine(SOURCES)
+
+app = FastAPI(title="Kathakaar Studio", version="2.0.0",
+              description="Multimodal, source-grounded cultural storytelling.")
+
+
+class StoryRequest(BaseModel):
+    query: str
+    place: str | None = None
+    mode: str = "grounded"  # "grounded" | "genai"
+
+
+from fastapi import Request as _Request
+from fastapi.responses import JSONResponse as _JSONResponse
+from fastapi.exceptions import RequestValidationError as _RVE
+
+
+@app.exception_handler(_RVE)
+async def _validation_handler(request: _Request, exc: _RVE):
+    return _JSONResponse(status_code=200, content={"accepted": False, "reason": "invalid request", "error": "invalid request"})
+
+
+@app.exception_handler(Exception)
+async def _unhandled_handler(request: _Request, exc: Exception):
+    return _JSONResponse(status_code=200, content={"accepted": False, "reason": "internal error", "error": str(exc)[:200]})
+
+
+@app.get("/api/health")
+def health() -> dict:
+    return {"status": "ok", "sources": len(SOURCES)}
+
+
+@app.get("/api/config")
+def config() -> dict:
+    return {"genai": genai.status(), "places": sorted({s.place for s in SOURCES})}
+
+
+@app.get("/api/places")
+def places() -> dict:
+    return {"places": sorted({s.place for s in SOURCES})}
+
+
+@app.post("/api/story")
+def story(req: StoryRequest) -> dict:
+    return ENGINE.compose(req.query, req.place, mode=req.mode)
+
+
+@app.post("/api/story-image")
+async def story_image(
+    image: UploadFile = File(...),
+    query: str = Form("history and architecture"),
+    mode: str = Form("grounded"),
+) -> dict:
+    """Multimodal: identify the place from an uploaded photo, then ground a story."""
+    data = await image.read()
+    place_hint = None
+    # 1) vision model identifies the place, if a vision provider is configured
+    if genai.available() and genai.status()["vision"]:
+        place_hint = genai.generate(
+            "Name only the famous place or monument shown, as 'City, Country'. "
+            "If unsure, reply 'unknown'.",
+            system="You identify world heritage sites from photos.",
+            image=data,
+        )
+    # 2) OCR fallback (any caption/text on the image)
+    if not place_hint or place_hint.lower().strip() == "unknown":
+        place_hint = genai.ocr(data) or place_hint
+    if not place_hint:
+        return {"accepted": False,
+                "reason": "Could not identify a place from the image. Enable a vision "
+                          "provider (set OPENAI_API_KEY/GEMINI_API_KEY) or type the place.",
+                "mode": "image"}
+    result = ENGINE.compose(query, place_hint.split("\n")[0].strip(), mode=mode)
+    result["identified_place"] = place_hint.strip()
+    return result
+
+
+if WEB.exists():
+    app.mount("/static", StaticFiles(directory=str(WEB)), name="static")
+
+    @app.get("/")
+    def index() -> FileResponse:
+        return FileResponse(str(WEB / "index.html"))

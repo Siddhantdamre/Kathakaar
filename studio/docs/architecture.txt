@@ -1,0 +1,9 @@
+Browser (web/index.html)
+   |  POST /api/story {place, theme}
+   v
+FastAPI (app/main.py)
+   |-> BM25 retrieval (app/retrieval.py)  -> top source passages
+   |-> story composer (app/story.py)      -> sentences chosen from sources
+   |-> grounding + citations (grounding.py) -> score, [n] cites, flags
+   v
+JSON -> rendered story with citations, grounding score, refusals
