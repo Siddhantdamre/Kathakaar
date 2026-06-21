@@ -33,6 +33,17 @@ ENGINE = StoryEngine(SOURCES)
 app = FastAPI(title="Kathakaar Studio", version="2.0.0",
               description="Multimodal, source-grounded cultural storytelling.")
 
+# Allow a separately-hosted frontend (e.g. GitHub Pages / Vercel) to call this
+# API cross-origin. Reads are public and stateless, so "*" is appropriate; set
+# KATHAKAAR_ALLOW_ORIGINS (comma-separated) to restrict to your own domains.
+import os as _os
+from fastapi.middleware.cors import CORSMiddleware as _CORS
+_origins = [o.strip() for o in _os.environ.get("KATHAKAAR_ALLOW_ORIGINS", "*").split(",") if o.strip()]
+app.add_middleware(
+    _CORS, allow_origins=_origins, allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["*"],
+)
+
 
 class StoryRequest(BaseModel):
     query: str

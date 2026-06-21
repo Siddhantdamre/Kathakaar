@@ -1,3 +1,22 @@
+Metadata-Version: 2.4
+Name: kathakaar
+Version: 0.3.0
+Summary: Provenance-first multimodal cultural retrieval and grounded storytelling.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Provides-Extra: multimodal
+Requires-Dist: pillow>=10.4; extra == "multimodal"
+Requires-Dist: torch>=2.3; extra == "multimodal"
+Requires-Dist: transformers>=4.45; extra == "multimodal"
+Provides-Extra: production
+Requires-Dist: psycopg[binary]>=3.2; extra == "production"
+Provides-Extra: dev
+Requires-Dist: mypy>=1.10; extra == "dev"
+Requires-Dist: pytest>=8.2; extra == "dev"
+Requires-Dist: ruff>=0.5; extra == "dev"
+Dynamic: license-file
+
 # Kathakaar
 
 [![Live demo](https://img.shields.io/badge/Live_demo-storytelling_studio-E8B04B?style=for-the-badge&logo=githubpages)](https://siddhantdamre.github.io/Kathakaar/)
@@ -9,20 +28,8 @@
 ```bash
 make demo        # a source-grounded story with citations + a refusal
 make test        # 32 tests
-cd studio && uvicorn app.main:app            # the web app
-cd studio && python scripts/eval_refusal.py  # honest refusal-gate evaluation
+cd studio && uvicorn app.main:app   # the web app
 ```
-
-## Honesty guarantee: the topic-relevance gate
-Grounding alone is not enough. Because every sentence is selected *from* a
-source, a naive grounding score is always ~100% and can never fail — so an
-unsupported request (e.g. *"alien spaceships"* for the Konark Sun Temple) would
-still return a confident, "grounded" story. Kathakaar now runs a
-**topic-relevance gate**: it refuses when the requested topic is not covered by
-the place's sources (`invention` vs `wrong-place` refusals) and reports an honest
-`relevance_score` separate from `grounding_score`. On a 29-case diagnostic set
-the **false-accept rate is 0.00** (refusal precision/recall 1.00). Method and
-limitations: [`docs/evaluation/refusal_v1.md`](docs/evaluation/refusal_v1.md).
 
 Provenance-first multimodal cultural retrieval and grounded storytelling.
 

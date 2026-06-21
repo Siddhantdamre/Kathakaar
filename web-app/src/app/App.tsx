@@ -1,0 +1,2310 @@
+import { useState, useRef, useCallback, useEffect } from "react";
+import { postStory, postStoryImage } from "./api";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { motion } from "motion/react";
+import {
+  Sun,
+  Moon,
+  ChevronDown,
+  BookOpen,
+  Sparkles,
+  ExternalLink,
+  RotateCcw,
+  Camera,
+  Check,
+  Play,
+  Pause,
+  Volume2,
+  Film,
+  Mic,
+} from "lucide-react";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type Mode = "grounded" | "genai" | "cinematic";
+type AppState =
+  | "idle"
+  | "loading"
+  | "success"
+  | "refusal"
+  | "photo"
+  | "cinematic-gen"
+  | "cinematic-done";
+
+interface Citation {
+  n: number;
+  title: string;
+  url: string;
+}
+
+interface Retrieved {
+  title: string;
+  score: number;
+}
+
+interface StoryData {
+  accepted: boolean;
+  place?: string;
+  story?: string;
+  grounding_score?: number;
+  citations?: Citation[];
+  unsupported?: string[];
+  retrieved?: Retrieved[];
+  mode?: string;
+  reason?: string;
+  identified_place?: string;
+  removed_claims?: number;
+}
+
+interface CinematicScene {
+  timestamp: string;
+  title: string;
+  narration: string;
+  imageId: string;
+  visualNote: string;
+}
+
+interface CinematicOutputData {
+  title: string;
+  place: string;
+  era: string;
+  duration: string;
+  style: string;
+  videoStyle: string;
+  heroImageId: string;
+  script: string;
+  scenes: CinematicScene[];
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PLACES = [
+  "Agra India",
+  "Hampi India",
+  "Khajuraho India",
+  "Konark India",
+  "Mahabalipuram India",
+  "Petra Jordan",
+  "Angkor (Siem Reap) Cambodia",
+  "Beijing China",
+  "Cusco Peru",
+  "Timbuktu Mali",
+];
+
+const SEED_CHIPS = [
+  "temple architecture and carvings",
+  "astronomical alignments",
+  "royal patronage and dynasties",
+  "trade routes and guilds",
+  "ritual dance traditions",
+];
+
+const CINEMATIC_ERAS = [
+  { id: "ancient", label: "Ancient", range: "pre-500 CE" },
+  { id: "medieval", label: "Medieval", range: "500–1500 CE" },
+  { id: "early-modern", label: "Early Modern", range: "1500–1800 CE" },
+  { id: "colonial", label: "Colonial Era", range: "1800–1950 CE" },
+  { id: "contemporary", label: "Contemporary", range: "1950 – present" },
+];
+
+const NARRATION_STYLES = [
+  "Documentary",
+  "Epic",
+  "Contemplative",
+  "Mythological",
+];
+
+const VIDEO_STYLES = [
+  "Aerial Cinematic",
+  "Archaeological",
+  "Atmospheric",
+  "Time-lapse",
+];
+
+const DURATIONS = ["60 seconds", "3 minutes", "5 minutes"];
+
+// ─── Mock data ────────────────────────────────────────────────────────────────
+
+const MOCK_GROUNDED: StoryData = {
+  accepted: true,
+  place: "Konark India",
+  story:
+    "The Konark Sun Temple, erected circa 1250 CE under King Narasimhadeva I of the Eastern Ganga dynasty, represents the apex of Odishan temple architecture.[1] Its entire complex was conceived as a colossal stone chariot of the Sun god Surya — drawn by seven horses and mounted on twenty-four elaborately carved wheels, each measuring approximately three metres in diameter.[2] Beyond their iconographic role, these wheels function as precise sundials: their spokes cast measurable shadows that divide the day into eight three-hour segments, a feat of applied astronomy that modern engineers have independently verified.[3] UNESCO inscribed the monument on the World Heritage List in 1984, citing its outstanding universal value as a masterpiece of creative human genius and its remarkable state of preservation relative to its age.[4]",
+  grounding_score: 94,
+  citations: [
+    {
+      n: 1,
+      title: "Konark Sun Temple — Archaeological Survey of India",
+      url: "https://asi.nic.in/konark-sun-temple",
+    },
+    {
+      n: 2,
+      title:
+        "Eastern Ganga Dynasty: Monuments & Iconography — Encyclopaedia Britannica",
+      url: "https://britannica.com/topic/Konark",
+    },
+    {
+      n: 3,
+      title:
+        "Astronomical Functions of the Konark Wheel — Indian Journal of History of Science",
+      url: "https://insa.nic.in/ijhs",
+    },
+    {
+      n: 4,
+      title: "World Heritage List: Sun Temple, Konark — UNESCO",
+      url: "https://whc.unesco.org/en/list/246",
+    },
+  ],
+  retrieved: [
+    { title: "ASI Konark Temple Field Documentation", score: 0.97 },
+    { title: "Encyclopaedia Britannica: Eastern Ganga", score: 0.89 },
+    { title: "IJHS Vol 54 — Astronomical Study 2019", score: 0.82 },
+    { title: "UNESCO WHC Nomination Dossier", score: 0.78 },
+    { title: "Odisha State Tourism Authority", score: 0.71 },
+  ],
+  mode: "grounded",
+};
+
+const MOCK_GENAI: StoryData = {
+  accepted: true,
+  place: "Hampi India",
+  story:
+    "Hampi, the last capital of the Vijayanagara Empire, flourished between the 14th and 16th centuries as one of the largest cities in the medieval world, home to an estimated population of several hundred thousand.[1] The Vittala Temple complex — with its celebrated stone chariot and musical pillars capable of producing seven distinct tonal notes — stands as the finest surviving example of Vijayanagara craftsmanship.[2] [CLAIM_REMOVED] The city was abruptly abandoned following the catastrophic Battle of Talikota in 1565, when a coalition of Deccan sultanates sacked and burned the capital over several days.[3]",
+  grounding_score: 81,
+  citations: [
+    {
+      n: 1,
+      title: "Vijayanagara Empire — Encyclopaedia Britannica",
+      url: "https://britannica.com/topic/Vijayanagara",
+    },
+    {
+      n: 2,
+      title: "Vittala Temple, Hampi — Archaeological Survey of India",
+      url: "https://asi.nic.in/hampi-vittala",
+    },
+    {
+      n: 3,
+      title: "Battle of Talikota, 1565 — Cambridge History of India",
+      url: "https://cambridge.org/india-history",
+    },
+  ],
+  retrieved: [
+    { title: "Encyclopaedia Britannica: Vijayanagara", score: 0.93 },
+    { title: "ASI Hampi Group of Monuments", score: 0.88 },
+    { title: "Cambridge History of India Vol 3", score: 0.8 },
+    { title: "Portuguese Traveller Accounts 15th–16th c.", score: 0.44 },
+  ],
+  unsupported: [
+    "Contemporary Portuguese travellers described the markets of Hampi as rivalling those of Lisbon in wealth and variety of goods.",
+  ],
+  removed_claims: 1,
+  mode: "genai",
+};
+
+const MOCK_REFUSAL: StoryData = {
+  accepted: false,
+  reason:
+    "No source in the ten-place corpus addresses the inner-sanctum ritual choreography of Timbuktu's Djinguereber Mosque with sufficient specificity. Kathakaar will not synthesise an answer from adjacent or circumstantial evidence.",
+};
+
+const MOCK_PHOTO: StoryData = {
+  ...MOCK_GROUNDED,
+  identified_place: "Konark, India",
+  mode: "grounded",
+};
+
+const MOCK_CINEMATIC: CinematicOutputData = {
+  title: "The Black Pagoda",
+  place: "Konark India",
+  era: "Medieval · 500–1500 CE",
+  duration: "3 minutes",
+  style: "Documentary",
+  videoStyle: "Aerial Cinematic",
+  heroImageId: "1569571665379-f952b753ccc7",
+  script:
+    "In the beginning, there was only the sea — and the imperative to mark time. Long before clocks divided the world into mechanical seconds, priests of the Sun god Surya drew circles in wet sand and watched how shadows moved across temple floors at different hours of different seasons. It was from this ancient hunger to master time that Konark was born.\n\nThe year was 1244 CE. Narasimhadeva, first of his name, stood at the edge of a half-built empire with a vow forming on his lips: he would build a chariot worthy of the sun itself — not of wood, which rots, not of bronze, which corrodes, but of stone that would outlast every dynasty, every monsoon, every army that ever crossed the Odishan coast.\n\nFor sixteen years, twelve hundred craftsmen carved its flanks in rotating shifts, working by torch-flame through the monsoon nights. Seven stone horses — mid-gallop, nostrils flared — were fitted to the base. Twenty-four wheels, each a perfect sundial, were installed with such precision that a shadow falling on their spokes would tell the hour.\n\nWhen the shikhara finally rose seventy metres above the beach, sailors navigating the Bay of Bengal called it the Black Pagoda and steered their ships by its silhouette for three centuries. The temple had become not just a monument but a lighthouse — not of light, but of time.",
+  scenes: [
+    {
+      timestamp: "0:00",
+      title: "The Ancient Coast",
+      narration:
+        "Before clocks divided the world into seconds, priests of Surya drew circles in wet sand and watched how shadows moved across stone floors at different hours of the day.",
+      imageId: "1602158761242-68e0a9e5d8d0",
+      visualNote:
+        "Drone aerial, slow push-in over Odishan coastline at golden hour",
+    },
+    {
+      timestamp: "0:48",
+      title: "A King's Vow",
+      narration:
+        "Narasimhadeva, first of his name, vowed to build a chariot worthy of the sun itself — not of wood or bronze, but of stone that would outlast every dynasty, every monsoon, every invading army.",
+      imageId: "1688406265997-77897c1a31d1",
+      visualNote:
+        "Match cut: sand circle → stone wheel; slow push on royal carved seal",
+    },
+    {
+      timestamp: "1:45",
+      title: "Twelve Hundred Craftsmen",
+      narration:
+        "For sixteen years they worked in rotating shifts, by torch-flame through monsoon nights. Each of the twenty-four wheels was a sundial; each of the seven horses a prayer for perpetual motion.",
+      imageId: "1741836646461-a95d77335f67",
+      visualNote:
+        "Macro tracking shot, hands carving stone, shallow depth of field",
+    },
+    {
+      timestamp: "2:30",
+      title: "The Black Pagoda",
+      narration:
+        "When the shikhara finally rose seventy metres above the sand, sailors crossing the Bay of Bengal named it the Black Pagoda and steered their ships by its silhouette for three centuries.",
+      imageId: "1725046908999-195118679132",
+      visualNote:
+        "Wide reverse reveal from the Bay of Bengal, sun behind the shikhara",
+    },
+  ],
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+type StoryToken =
+  | string
+  | { type: "citation"; n: number }
+  | { type: "removed" };
+
+function parseStory(text: string): StoryToken[] {
+  const parts = text.split(/(\[\d+\]|\[CLAIM_REMOVED\])/);
+  return parts.map((part) => {
+    const m = part.match(/^\[(\d+)\]$/);
+    if (m) return { type: "citation" as const, n: parseInt(m[1]) };
+    if (part === "[CLAIM_REMOVED]") return { type: "removed" as const };
+    return part;
+  });
+}
+
+function durationToSecs(dur: string): number {
+  if (dur === "60 seconds") return 60;
+  if (dur === "3 minutes") return 180;
+  return 300;
+}
+
+function formatProgress(progress: number, totalSecs: number): string {
+  const secs = Math.floor((progress / 100) * totalSecs);
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// ─── Waveform heights and animation targets ───────────────────────────────────
+
+const WAVE_H = [
+  3, 6, 11, 18, 24, 20, 28, 22, 16, 26, 20, 28, 24, 28, 18, 28, 26, 20, 28,
+  22, 18, 28, 20, 16, 24, 18, 12, 7, 4,
+];
+const WAVE_T = [
+  0.6, 0.5, 0.4, 0.3, 0.25, 0.35, 0.2, 0.3, 0.4, 0.22, 0.32, 0.2, 0.28,
+  0.2, 0.35, 0.22, 0.25, 0.32, 0.2, 0.28, 0.35, 0.22, 0.3, 0.4, 0.28, 0.38,
+  0.45, 0.55, 0.65,
+];
+
+// ─── AudioWaveform ────────────────────────────────────────────────────────────
+
+function AudioWaveform({
+  isPlaying,
+  color = "var(--primary)",
+}: {
+  isPlaying: boolean;
+  color?: string;
+}) {
+  return (
+    <div
+      className="flex items-center gap-[2.5px]"
+      aria-hidden="true"
+      style={{ height: 24 }}
+    >
+      {WAVE_H.map((h, i) => (
+        <motion.div
+          key={i}
+          style={{
+            width: 3,
+            height: h,
+            backgroundColor: color,
+            borderRadius: 2,
+            originY: 0.5,
+          }}
+          animate={
+            isPlaying
+              ? { scaleY: [1, WAVE_T[i] + 0.05, 1] }
+              : { scaleY: 0.3 }
+          }
+          transition={
+            isPlaying
+              ? {
+                  duration: 0.45 + (i % 5) * 0.09,
+                  repeat: Infinity,
+                  delay: (i % 9) * 0.045,
+                  ease: "easeInOut",
+                }
+              : { duration: 0.4 }
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── CinematicGenProgress ─────────────────────────────────────────────────────
+
+const GEN_STEPS = [
+  { label: "Writing narrative script", icon: <Mic className="w-3 h-3" /> },
+  { label: "Synthesising voice narration", icon: <Volume2 className="w-3 h-3" /> },
+  { label: "Generating scenes & visuals", icon: <Camera className="w-3 h-3" /> },
+  { label: "Compositing final video", icon: <Film className="w-3 h-3" /> },
+];
+
+function CinematicGenProgress({ currentStep }: { currentStep: number }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-10 p-8">
+      {/* Spinner emblem */}
+      <div className="relative w-[72px] h-[72px]">
+        <div
+          className="absolute inset-0 rounded-full border"
+          style={{
+            borderColor:
+              "color-mix(in srgb, var(--accent) 18%, transparent)",
+          }}
+        />
+        <div
+          className="absolute inset-0 rounded-full border-2 border-transparent border-t-accent animate-spin"
+          style={{ borderTopColor: "var(--accent)" }}
+        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Film
+            className="w-6 h-6"
+            style={{ color: "var(--accent)" }}
+          />
+        </div>
+      </div>
+
+      {/* Steps */}
+      <div className="w-full max-w-[280px] space-y-3.5">
+        {GEN_STEPS.map((step, i) => {
+          const done = i < currentStep;
+          const active = i === currentStep;
+          return (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: -8 }}
+              animate={
+                i <= currentStep
+                  ? { opacity: 1, x: 0 }
+                  : { opacity: 0.18, x: 0 }
+              }
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex items-center gap-3"
+            >
+              {/* Step indicator */}
+              <div
+                className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all duration-300"
+                style={{
+                  backgroundColor: done
+                    ? "var(--primary)"
+                    : active
+                      ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+                      : "transparent",
+                  borderColor: done
+                    ? "var(--primary)"
+                    : active
+                      ? "var(--accent)"
+                      : "var(--border)",
+                  color: done
+                    ? "var(--primary-foreground)"
+                    : active
+                      ? "var(--accent)"
+                      : "var(--muted-foreground)",
+                }}
+              >
+                {done ? (
+                  <Check className="w-3 h-3" />
+                ) : active ? (
+                  <motion.div
+                    animate={{ scale: [1, 1.3, 1] }}
+                    transition={{ duration: 0.8, repeat: Infinity }}
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      backgroundColor: "var(--accent)",
+                    }}
+                  />
+                ) : (
+                  step.icon
+                )}
+              </div>
+
+              {/* Label */}
+              <span
+                className="text-sm"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  color:
+                    i <= currentStep
+                      ? "var(--foreground)"
+                      : "color-mix(in srgb, var(--muted-foreground) 40%, transparent)",
+                }}
+              >
+                {step.label}
+              </span>
+
+              {done && (
+                <span
+                  className="ml-auto text-[10px]"
+                  style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    color: "var(--primary)",
+                  }}
+                >
+                  done
+                </span>
+              )}
+              {active && (
+                <span
+                  className="ml-auto text-[10px]"
+                  style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    color: "var(--accent)",
+                  }}
+                >
+                  working…
+                </span>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+
+      <p
+        className="text-xs"
+        style={{
+          fontFamily: "'Fraunces', serif",
+          fontStyle: "italic",
+          fontWeight: 300,
+          color:
+            "color-mix(in srgb, var(--muted-foreground) 55%, transparent)",
+        }}
+      >
+        Composing an imaginative reconstruction — not a verified account
+      </p>
+    </div>
+  );
+}
+
+// ─── CinematicOutput ─────────────────────────────────────────────────────────
+
+function CinematicOutput({ data }: { data: CinematicOutputData }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const totalSecs = durationToSecs(data.duration);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 100) {
+          setIsPlaying(false);
+          return 0;
+        }
+        return p + 100 / (totalSecs * 10);
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isPlaying, totalSecs]);
+
+  const handleScrub = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    setProgress(pct);
+  };
+
+  const heroUrl = `https://images.unsplash.com/photo-${data.heroImageId}?w=1200&h=675&fit=crop&auto=format`;
+
+  return (
+    <div className="flex flex-col flex-1">
+      {/* Ungrounded disclaimer banner */}
+      <div
+        className="flex items-center gap-2.5 px-5 sm:px-6 py-2.5 border-b shrink-0"
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--accent) 7%, transparent)",
+          borderColor: "color-mix(in srgb, var(--accent) 18%, transparent)",
+        }}
+      >
+        <Sparkles
+          className="w-3.5 h-3.5 shrink-0"
+          style={{ color: "var(--accent)" }}
+        />
+        <p
+          className="text-xs leading-snug"
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            color: "color-mix(in srgb, var(--accent) 80%, transparent)",
+          }}
+        >
+          <span className="font-semibold">Cinematic · ungrounded</span> — this
+          is an AI-generated imaginative reconstruction, not verified history
+        </p>
+      </div>
+
+      <div className="overflow-y-auto flex-1">
+        {/* Video player */}
+        <div className="p-5 sm:p-6 pb-0">
+          <div
+            className="relative rounded-xl overflow-hidden bg-black"
+            style={{ aspectRatio: "16/9" }}
+          >
+            {/* Hero thumbnail */}
+            <img
+              src={heroUrl}
+              alt={`Cinematic story of ${data.place}`}
+              className="w-full h-full object-cover"
+              style={{ opacity: 0.75 }}
+            />
+
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/30" />
+
+            {/* Title overlay */}
+            <div className="absolute top-3 left-4 sm:top-4 sm:left-5">
+              <h3
+                className="text-white text-base sm:text-lg font-medium leading-tight"
+                style={{ fontFamily: "'Fraunces', serif", fontWeight: 300 }}
+              >
+                {data.title}
+              </h3>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {[data.era, data.style, data.videoStyle].map((badge, i) => (
+                  <span
+                    key={i}
+                    className="text-[9.5px] px-1.5 py-0.5 rounded"
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      backgroundColor: "rgba(0,0,0,0.45)",
+                      color: "rgba(255,255,255,0.55)",
+                    }}
+                  >
+                    {badge}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Centre play/pause */}
+            <button
+              onClick={() => setIsPlaying((p) => !p)}
+              className="absolute inset-0 flex items-center justify-center focus:outline-none"
+              aria-label={isPlaying ? "Pause narration" : "Play narration"}
+            >
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.92 }}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-2xl"
+                style={{ backgroundColor: "var(--primary)" }}
+              >
+                {isPlaying ? (
+                  <Pause
+                    className="w-6 h-6 sm:w-7 sm:h-7"
+                    style={{ color: "var(--primary-foreground)" }}
+                  />
+                ) : (
+                  <Play
+                    className="w-6 h-6 sm:w-7 sm:h-7 ml-0.5"
+                    style={{ color: "var(--primary-foreground)" }}
+                  />
+                )}
+              </motion.div>
+            </button>
+
+            {/* Bottom controls */}
+            <div
+              className="absolute bottom-0 left-0 right-0 px-4 pt-8 pb-3 sm:px-5"
+              style={{
+                background:
+                  "linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%)",
+              }}
+            >
+              {/* Waveform */}
+              <div className="mb-2 overflow-hidden">
+                <AudioWaveform
+                  isPlaying={isPlaying}
+                  color="rgba(232, 176, 75, 0.7)"
+                />
+              </div>
+
+              {/* Scrubber */}
+              <div
+                className="h-0.5 rounded-full cursor-pointer mb-2 relative"
+                style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+                onClick={handleScrub}
+                role="slider"
+                aria-label="Video playback position"
+                aria-valuenow={Math.round(progress)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full transition-all duration-100"
+                  style={{
+                    width: `${progress}%`,
+                    backgroundColor: "var(--primary)",
+                  }}
+                />
+                {/* Scrubber handle */}
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full -translate-x-1/2 shadow"
+                  style={{
+                    left: `${progress}%`,
+                    backgroundColor: "var(--primary)",
+                  }}
+                />
+              </div>
+
+              {/* Time row */}
+              <div
+                className="flex items-center justify-between"
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: "0.625rem",
+                  color: "rgba(255,255,255,0.4)",
+                }}
+              >
+                <span>{formatProgress(progress, totalSecs)}</span>
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-3 h-3" />
+                  <span>{data.duration}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Narration script */}
+        <div className="px-5 sm:px-6 pt-6 pb-4">
+          <h4
+            className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-muted-foreground/50 mb-4"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            Full narration
+          </h4>
+          <div
+            className="space-y-4 text-[1.0rem] leading-[1.9] text-foreground"
+            style={{
+              fontFamily: "'Fraunces', Georgia, serif",
+              fontWeight: 300,
+            }}
+          >
+            {data.script.split("\n\n").map((para, i) => (
+              <p key={i}>{para}</p>
+            ))}
+          </div>
+        </div>
+
+        {/* Scene breakdown */}
+        <div
+          className="px-5 sm:px-6 pb-7 pt-5 border-t"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <h4
+            className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-muted-foreground/50 mb-4"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            Scene breakdown
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {data.scenes.map((scene, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + i * 0.08, duration: 0.4 }}
+                className="rounded-lg border overflow-hidden flex flex-col"
+                style={{ borderColor: "var(--border)" }}
+              >
+                {/* Scene thumbnail */}
+                <div
+                  className="relative overflow-hidden"
+                  style={{ height: 96 }}
+                >
+                  <img
+                    src={`https://images.unsplash.com/photo-${scene.imageId}?w=600&h=200&fit=crop&auto=format`}
+                    alt={scene.title}
+                    className="w-full h-full object-cover"
+                    style={{ opacity: 0.72 }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/65 to-transparent" />
+                  <span
+                    className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-white/65"
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: "0.625rem",
+                      backgroundColor: "rgba(0,0,0,0.4)",
+                    }}
+                  >
+                    {scene.timestamp}
+                  </span>
+                  <h5
+                    className="absolute bottom-2 left-2 text-xs font-semibold text-white"
+                    style={{ fontFamily: "'Inter', sans-serif" }}
+                  >
+                    {scene.title}
+                  </h5>
+                </div>
+
+                {/* Scene text */}
+                <div className="p-3 flex-1 space-y-1.5">
+                  <p
+                    className="text-xs leading-relaxed text-foreground"
+                    style={{
+                      fontFamily: "'Fraunces', serif",
+                      fontStyle: "italic",
+                      fontWeight: 300,
+                    }}
+                  >
+                    {scene.narration}
+                  </p>
+                  <p
+                    className="text-[10px] leading-snug"
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      color:
+                        "color-mix(in srgb, var(--accent) 55%, transparent)",
+                    }}
+                  >
+                    ↳ {scene.visualNote}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── GroundingMeter ───────────────────────────────────────────────────────────
+
+function GroundingMeter({ score }: { score: number }) {
+  const [displayed, setDisplayed] = useState(0);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDisplayed(score), 80);
+    return () => clearTimeout(t);
+  }, [score]);
+
+  const r = 40;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - displayed / 100);
+  const arc =
+    score >= 85
+      ? "var(--primary)"
+      : score >= 60
+        ? "var(--accent)"
+        : "#EF8C8C";
+
+  return (
+    <div className="flex items-center gap-5">
+      <svg
+        width="96"
+        height="96"
+        viewBox="0 0 96 96"
+        aria-label={`Grounding score: ${score} percent`}
+        role="img"
+      >
+        <circle
+          cx="48"
+          cy="48"
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="5"
+          className="text-muted opacity-25"
+        />
+        <circle
+          cx="48"
+          cy="48"
+          r={r}
+          fill="none"
+          stroke={arc}
+          strokeWidth="5"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform="rotate(-90 48 48)"
+          style={{
+            transition: "stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)",
+          }}
+        />
+        <text
+          x="48"
+          y="44"
+          textAnchor="middle"
+          fontSize="17"
+          fontWeight="500"
+          fill={arc}
+          fontFamily="'JetBrains Mono', monospace"
+        >
+          {displayed}
+        </text>
+        <text
+          x="48"
+          y="57"
+          textAnchor="middle"
+          fontSize="8"
+          fill="currentColor"
+          opacity="0.45"
+          fontFamily="'Inter', sans-serif"
+          letterSpacing="0.08em"
+        >
+          GROUNDED
+        </text>
+      </svg>
+      <div>
+        <p className="text-sm font-medium text-foreground leading-snug">
+          Source fidelity
+        </p>
+        <p
+          className="text-xs text-muted-foreground mt-0.5 leading-relaxed max-w-[180px]"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          Every claim traces to a named, retrievable source
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── CitationChip ─────────────────────────────────────────────────────────────
+
+function CitationChip({
+  n,
+  citations,
+}: {
+  n: number;
+  citations: Citation[];
+}) {
+  const cit = citations.find((c) => c.n === n);
+  return (
+    <a
+      href={cit?.url ?? "#"}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={cit?.title}
+      aria-label={`Source ${n}: ${cit?.title ?? "unknown"}`}
+      className="inline-flex items-center justify-center leading-none px-1 py-px rounded border transition-colors ml-0.5 focus:outline-none focus:ring-1 focus:ring-ring hover:opacity-80"
+      style={{
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: "0.58rem",
+        verticalAlign: "super",
+        backgroundColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
+        color: "var(--primary)",
+        borderColor: "color-mix(in srgb, var(--primary) 30%, transparent)",
+      }}
+    >
+      {n}
+    </a>
+  );
+}
+
+// ─── CitedStory ───────────────────────────────────────────────────────────────
+
+function CitedStory({
+  story,
+  citations,
+}: {
+  story: string;
+  citations: Citation[];
+}) {
+  const tokens = parseStory(story);
+  return (
+    <p
+      className="leading-[1.9] text-[1.0625rem] text-foreground"
+      style={{
+        fontFamily: "'Fraunces', Georgia, serif",
+        fontWeight: 300,
+        fontOpticalSizing: "auto",
+      }}
+    >
+      {tokens.map((token, i) => {
+        if (typeof token === "string") return <span key={i}>{token}</span>;
+        if (token.type === "citation")
+          return <CitationChip key={i} n={token.n} citations={citations} />;
+        if (token.type === "removed")
+          return (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 mx-1 px-2 py-0.5 rounded-md border"
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "0.7rem",
+                fontWeight: 500,
+                verticalAlign: "middle",
+                backgroundColor:
+                  "color-mix(in srgb, #F43F5E 10%, transparent)",
+                color: "#FDA4AF",
+                borderColor:
+                  "color-mix(in srgb, #F43F5E 22%, transparent)",
+              }}
+              aria-label="One claim removed as unverified"
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  backgroundColor: "#FDA4AF",
+                  flexShrink: 0,
+                }}
+              />
+              1 claim removed — unverified
+            </span>
+          );
+        return null;
+      })}
+    </p>
+  );
+}
+
+// ─── RefusalCard ─────────────────────────────────────────────────────────────
+
+function RefusalCard({ reason }: { reason: string }) {
+  return (
+    <div className="flex-1 flex items-center justify-center p-8 sm:p-12">
+      <div
+        className="max-w-[440px] w-full rounded-xl border overflow-hidden"
+        style={{
+          backgroundColor: "var(--card)",
+          borderColor: "var(--border)",
+        }}
+      >
+        <div
+          className="h-[3px]"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, var(--primary) 30%, var(--primary) 70%, transparent)",
+          }}
+        />
+        <div className="px-8 py-10 flex flex-col items-center text-center gap-6">
+          <div
+            className="w-[52px] h-[52px] rounded-full flex items-center justify-center border"
+            style={{
+              backgroundColor:
+                "color-mix(in srgb, var(--primary) 8%, transparent)",
+              borderColor:
+                "color-mix(in srgb, var(--primary) 22%, transparent)",
+            }}
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 22 22"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle
+                cx="11"
+                cy="11"
+                r="9"
+                stroke="var(--primary)"
+                strokeWidth="1.2"
+              />
+              <path
+                d="M11 7v5"
+                stroke="var(--primary)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <circle cx="11" cy="15" r="0.8" fill="var(--primary)" />
+            </svg>
+          </div>
+          <div className="space-y-3">
+            <h3
+              className="text-[1.05rem] font-semibold tracking-tight text-foreground"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              Kathakaar declined to invent
+            </h3>
+            <p
+              className="text-[0.9375rem] text-muted-foreground leading-relaxed"
+              style={{
+                fontFamily: "'Fraunces', Georgia, serif",
+                fontStyle: "italic",
+                fontWeight: 300,
+              }}
+            >
+              &ldquo;{reason}&rdquo;
+            </p>
+          </div>
+          <div className="w-full pt-5 border-t" style={{ borderColor: "var(--border)" }}>
+            <p
+              className="text-xs leading-relaxed"
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                color:
+                  "color-mix(in srgb, var(--muted-foreground) 65%, transparent)",
+              }}
+            >
+              This is not a failure — it is a guarantee. Kathakaar refuses to
+              speculate beyond what its sources can verify. Use{" "}
+              <span style={{ color: "var(--accent)" }}>Cinematic</span> mode
+              for imaginative reconstructions without source constraints.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ProvenanceList ───────────────────────────────────────────────────────────
+
+function ProvenanceList({ citations }: { citations: Citation[] }) {
+  return (
+    <div>
+      <h4
+        className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-muted-foreground/60 mb-3"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        Provenance
+      </h4>
+      <ol className="space-y-2.5">
+        {citations.map((cit) => (
+          <li key={cit.n} className="flex items-start gap-3 group">
+            <span
+              className="shrink-0 w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9.5px] font-medium mt-px"
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                backgroundColor:
+                  "color-mix(in srgb, var(--primary) 12%, transparent)",
+                color: "var(--primary)",
+              }}
+            >
+              {cit.n}
+            </span>
+            <a
+              href={cit.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm text-muted-foreground group-hover:text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-ring rounded"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              <span className="group-hover:underline underline-offset-2 decoration-primary/40">
+                {cit.title}
+              </span>
+              <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-50 transition-opacity" />
+            </a>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+// ─── RetrievedChips ───────────────────────────────────────────────────────────
+
+function RetrievedChips({ retrieved }: { retrieved: Retrieved[] }) {
+  return (
+    <div>
+      <h4
+        className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-muted-foreground/60 mb-3"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        Retrieved &amp; ranked
+      </h4>
+      <div className="flex flex-wrap gap-2">
+        {retrieved.map((r, i) => {
+          const pct = Math.round(r.score * 100);
+          const strong = r.score > 0.8;
+          const mid = r.score > 0.6;
+          return (
+            <div
+              key={i}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs"
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                backgroundColor: strong
+                  ? "color-mix(in srgb, var(--primary) 8%, transparent)"
+                  : mid
+                    ? "color-mix(in srgb, var(--accent) 8%, transparent)"
+                    : "color-mix(in srgb, var(--muted-foreground) 6%, transparent)",
+                borderColor: strong
+                  ? "color-mix(in srgb, var(--primary) 25%, transparent)"
+                  : mid
+                    ? "color-mix(in srgb, var(--accent) 25%, transparent)"
+                    : "var(--border)",
+                color: strong
+                  ? "var(--primary)"
+                  : mid
+                    ? "var(--accent)"
+                    : "var(--muted-foreground)",
+              }}
+            >
+              <span>{r.title}</span>
+              <span
+                className="opacity-60"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                {pct}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── ModeBadge ────────────────────────────────────────────────────────────────
+
+function ModeBadge({ mode }: { mode: string }) {
+  const isGenai = mode === "genai";
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
+      style={{
+        fontFamily: "'Inter', sans-serif",
+        backgroundColor: isGenai
+          ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+          : "color-mix(in srgb, var(--primary) 10%, transparent)",
+        color: isGenai ? "var(--accent)" : "var(--primary)",
+        borderColor: isGenai
+          ? "color-mix(in srgb, var(--accent) 25%, transparent)"
+          : "color-mix(in srgb, var(--primary) 25%, transparent)",
+      }}
+    >
+      {isGenai ? (
+        <Sparkles className="w-3 h-3" />
+      ) : (
+        <BookOpen className="w-3 h-3" />
+      )}
+      {isGenai ? "GenAI · verified" : "Grounded"}
+    </span>
+  );
+}
+
+// ─── LoadingSkeleton ──────────────────────────────────────────────────────────
+
+function LoadingSkeleton({ place }: { place: string }) {
+  return (
+    <div className="p-7 sm:p-8 flex-1 space-y-7 animate-pulse">
+      <div className="flex items-center gap-5">
+        <div className="w-24 h-24 rounded-full bg-muted/30" />
+        <div className="space-y-2">
+          <div className="h-4 w-28 bg-muted/30 rounded" />
+          <div className="h-3 w-44 bg-muted/20 rounded" />
+        </div>
+      </div>
+      {place && (
+        <p
+          className="text-xs text-muted-foreground/50"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          Retrieving sources for {place}…
+        </p>
+      )}
+      <div className="space-y-3">
+        {[1, 0.95, 0.88, 1, 0.72, 0.9, 0.6].map((w, i) => (
+          <div
+            key={i}
+            className="h-4 bg-muted/25 rounded"
+            style={{ width: `${w * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="pt-3 border-t border-border/30 space-y-2.5">
+        <div className="h-3 w-20 bg-muted/20 rounded" />
+        {[0.7, 0.55, 0.65, 0.5].map((w, i) => (
+          <div
+            key={i}
+            className="h-3 bg-muted/15 rounded"
+            style={{ width: `${w * 100}%` }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── EmptyState ───────────────────────────────────────────────────────────────
+
+function EmptyState() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-6 py-16 px-8 text-center">
+      <div
+        className="w-14 h-14 rounded-full border flex items-center justify-center"
+        style={{
+          backgroundColor:
+            "color-mix(in srgb, var(--primary) 6%, transparent)",
+          borderColor:
+            "color-mix(in srgb, var(--primary) 18%, transparent)",
+        }}
+      >
+        <svg
+          width="26"
+          height="26"
+          viewBox="0 0 26 26"
+          fill="none"
+          aria-hidden="true"
+        >
+          <rect
+            x="3.5"
+            y="4.5"
+            width="19"
+            height="17"
+            rx="2"
+            stroke="var(--primary)"
+            strokeWidth="1.2"
+          />
+          <path
+            d="M3.5 9.5h19"
+            stroke="var(--primary)"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M8.5 4.5v5M17.5 4.5v5"
+            stroke="var(--primary)"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M7.5 14.5h5M7.5 17.5h8"
+            stroke="var(--primary)"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+      <div className="space-y-2.5">
+        <h3
+          className="text-base font-medium text-foreground"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          Begin a grounded inquiry
+        </h3>
+        <p
+          className="text-sm text-muted-foreground max-w-[260px] leading-relaxed"
+          style={{
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontWeight: 300,
+            fontStyle: "italic",
+          }}
+        >
+          Select a place, enter a theme, and Kathakaar will compose a story
+          from verified sources — nothing more.
+        </p>
+      </div>
+      <div
+        className="flex flex-col gap-1.5 mt-2 text-xs text-center"
+        style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          color:
+            "color-mix(in srgb, var(--muted-foreground) 45%, transparent)",
+        }}
+      >
+        <span>Timbuktu Mali → elegant refusal state</span>
+        <span>GenAI mode → live claim removal</span>
+        <span>Cinematic mode → AI video + voice narration</span>
+        <span>Upload photo → visual identification</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── PhotoDropZone ────────────────────────────────────────────────────────────
+
+function PhotoDropZone({
+  onPhotoSelect,
+  photo,
+}: {
+  onPhotoSelect: (file: File) => void;
+  photo: File | null;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!photo) {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(photo);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
+
+  const onDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file && file.type.startsWith("image/")) onPhotoSelect(file);
+    },
+    [onPhotoSelect]
+  );
+
+  return (
+    <div>
+      <label
+        className="block text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted-foreground/60 mb-2"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        Photo identification
+      </label>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="Drop a photo of a place to identify and ground. Press Enter or click to browse."
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragEnter={() => setIsDragging(true)}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={onDrop}
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
+        className="relative flex flex-col items-center justify-center gap-2 rounded-lg cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring"
+        style={{
+          borderWidth: 1,
+          borderStyle: preview ? "solid" : "dashed",
+          borderColor: isDragging
+            ? "color-mix(in srgb, var(--primary) 60%, transparent)"
+            : preview
+              ? "var(--border)"
+              : "color-mix(in srgb, var(--muted-foreground) 25%, transparent)",
+          backgroundColor: isDragging
+            ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+            : "transparent",
+          height: preview ? "7rem" : "6rem",
+          padding: preview ? 4 : "1rem",
+          transform: isDragging ? "scale(1.01)" : "scale(1)",
+        }}
+      >
+        {preview ? (
+          <img
+            src={preview}
+            alt="Uploaded place photo"
+            className="w-full h-full object-cover rounded-md"
+          />
+        ) : (
+          <>
+            <Camera
+              className="w-5 h-5"
+              style={{
+                color: "var(--muted-foreground)",
+                opacity: 0.45,
+              }}
+            />
+            <p
+              className="text-xs text-center leading-relaxed"
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                color:
+                  "color-mix(in srgb, var(--muted-foreground) 60%, transparent)",
+              }}
+            >
+              drop a photo of a place
+              <br />
+              <span
+                style={{
+                  color:
+                    "color-mix(in srgb, var(--primary) 70%, transparent)",
+                }}
+              >
+                identify, then ground
+              </span>
+            </p>
+          </>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onPhotoSelect(file);
+            e.target.value = "";
+          }}
+          aria-label="Upload place photo"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── PlaceSelect ──────────────────────────────────────────────────────────────
+
+function PlaceSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <SelectPrimitive.Root value={value} onValueChange={onChange}>
+      <SelectPrimitive.Trigger
+        className="w-full flex items-center justify-between px-3 py-[0.5rem] rounded-lg border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+        style={{
+          backgroundColor:
+            "color-mix(in srgb, var(--secondary) 30%, transparent)",
+          fontFamily: "'Inter', sans-serif",
+        }}
+        aria-label="Select a cultural place"
+      >
+        <SelectPrimitive.Value placeholder="Select a place…" />
+        <SelectPrimitive.Icon asChild>
+          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 ml-2" />
+        </SelectPrimitive.Icon>
+      </SelectPrimitive.Trigger>
+
+      <SelectPrimitive.Portal>
+        <SelectPrimitive.Content
+          className="z-[100] min-w-[220px] rounded-lg border border-border shadow-2xl overflow-hidden"
+          style={{ backgroundColor: "var(--popover)" }}
+          position="popper"
+          sideOffset={4}
+        >
+          <SelectPrimitive.Viewport className="p-1">
+            {PLACES.map((place) => (
+              <SelectPrimitive.Item
+                key={place}
+                value={place}
+                className="flex items-center justify-between px-3 py-2 text-sm rounded-md cursor-pointer outline-none transition-colors"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  color: "var(--popover-foreground)",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "color-mix(in srgb, var(--primary) 10%, transparent)";
+                  (e.currentTarget as HTMLElement).style.color =
+                    "var(--primary)";
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget as HTMLElement;
+                  const isSelected =
+                    el.getAttribute("data-state") === "checked";
+                  el.style.backgroundColor = isSelected
+                    ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+                    : "";
+                  el.style.color = isSelected
+                    ? "var(--primary)"
+                    : "var(--popover-foreground)";
+                }}
+              >
+                <SelectPrimitive.ItemText>{place}</SelectPrimitive.ItemText>
+                <SelectPrimitive.ItemIndicator>
+                  <Check
+                    className="w-3.5 h-3.5 ml-2"
+                    style={{ color: "var(--primary)" }}
+                  />
+                </SelectPrimitive.ItemIndicator>
+              </SelectPrimitive.Item>
+            ))}
+          </SelectPrimitive.Viewport>
+        </SelectPrimitive.Content>
+      </SelectPrimitive.Portal>
+    </SelectPrimitive.Root>
+  );
+}
+
+// ─── ChipGroup — reusable single-select chip row ──────────────────────────────
+
+function ChipGroup({
+  label,
+  options,
+  value,
+  onChange,
+  renderLabel,
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (v: string) => void;
+  renderLabel?: (v: string) => React.ReactNode;
+}) {
+  return (
+    <div>
+      <p
+        className="text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted-foreground/60 mb-2"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        {label}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            onClick={() => onChange(opt)}
+            className="text-xs px-2.5 py-1 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              borderColor:
+                value === opt
+                  ? "color-mix(in srgb, var(--accent) 40%, transparent)"
+                  : "var(--border)",
+              backgroundColor:
+                value === opt
+                  ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+                  : "transparent",
+              color: value === opt ? "var(--accent)" : "var(--muted-foreground)",
+            }}
+            aria-pressed={value === opt}
+          >
+            {renderLabel ? renderLabel(opt) : opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── App ─────────────────────────────────────────────────────────────────────
+
+export default function App() {
+  const [isDark, setIsDark] = useState(true);
+  const [mode, setMode] = useState<Mode>("grounded");
+  const [place, setPlace] = useState("");
+  const [query, setQuery] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [appState, setAppState] = useState<AppState>("idle");
+  const [storyData, setStoryData] = useState<StoryData | null>(null);
+
+  // Cinematic config
+  const [selectedEra, setSelectedEra] = useState("medieval");
+  const [narrationStyle, setNarrationStyle] = useState("Documentary");
+  const [videoStyle, setVideoStyle] = useState("Aerial Cinematic");
+  const [videoDuration, setVideoDuration] = useState("3 minutes");
+  const [genStep, setGenStep] = useState(-1);
+  const [cinematicData, setCinematicData] =
+    useState<CinematicOutputData | null>(null);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+  }, [isDark]);
+
+  useEffect(() => {
+    document.documentElement.classList.add("dark");
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!place && !photo) return;
+
+    if (mode === "cinematic") {
+      setGenStep(-1);
+      setAppState("cinematic-gen");
+      await delay(250);
+      setGenStep(0);
+      await delay(1200);
+      setGenStep(1);
+      await delay(1350);
+      setGenStep(2);
+      await delay(1600);
+      setGenStep(3);
+      await delay(1050);
+      const era = CINEMATIC_ERAS.find((e) => e.id === selectedEra);
+      setCinematicData({
+        ...MOCK_CINEMATIC,
+        place: photo ? "Konark India" : place,
+        era: era ? `${era.label} · ${era.range}` : MOCK_CINEMATIC.era,
+        duration: videoDuration,
+        style: narrationStyle,
+        videoStyle,
+      });
+      setAppState("cinematic-done");
+      return;
+    }
+
+    setAppState("loading");
+    const apiMode = mode === "genai" ? "genai" : "grounded";
+    try {
+      const data = photo
+        ? await postStoryImage(photo, query, apiMode)
+        : await postStory(query, place, apiMode);
+      setStoryData(data);
+      if (!data.accepted) setAppState("refusal");
+      else setAppState(photo ? "photo" : "success");
+    } catch {
+      setStoryData({
+        accepted: false,
+        reason:
+          "Could not reach the Kathakaar API. Start the backend (run `uvicorn app.main:app` in the studio/ folder), or set VITE_API_BASE to your deployed URL.",
+      });
+      setAppState("refusal");
+    }
+  };
+
+  const handleReset = () => {
+    setAppState("idle");
+    setStoryData(null);
+    setCinematicData(null);
+    setPhoto(null);
+    setGenStep(-1);
+  };
+
+  const isGenerating = appState === "loading" || appState === "cinematic-gen";
+  const canSubmit = (place !== "" || photo !== null) && !isGenerating;
+  const showStory =
+    (appState === "success" || appState === "photo") && storyData?.accepted;
+
+  const MODE_DEFS = [
+    {
+      id: "grounded" as Mode,
+      Icon: BookOpen,
+      short: "Source",
+      full: "Grounded",
+      desc: "Only sentences directly traceable to a named source are shown.",
+    },
+    {
+      id: "genai" as Mode,
+      Icon: Sparkles,
+      short: "AI ✓",
+      full: "GenAI · verified",
+      desc: "AI-composed, then each claim verified — unsupported ones dropped.",
+    },
+    {
+      id: "cinematic" as Mode,
+      Icon: Film,
+      short: "Film",
+      full: "Cinematic",
+      desc: "Ungrounded AI narrative with voice and AI-generated video scenes.",
+    },
+  ];
+
+  const isCinematic = mode === "cinematic";
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-sm">
+        <div className="max-w-[1320px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div
+              className="w-[28px] h-[28px] rounded-md flex items-center justify-center border shrink-0"
+              style={{
+                backgroundColor:
+                  "color-mix(in srgb, var(--primary) 12%, transparent)",
+                borderColor:
+                  "color-mix(in srgb, var(--primary) 28%, transparent)",
+              }}
+              aria-hidden="true"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <polygon
+                  points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5"
+                  stroke="var(--primary)"
+                  strokeWidth="1.1"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M7 1v12M1 4.5l6 3.2 6-3.2"
+                  stroke="var(--primary)"
+                  strokeWidth="1"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            <span
+              className="text-sm font-semibold tracking-tight"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              Kathakaar{" "}
+              <span style={{ color: "var(--primary)" }}>Studio</span>
+            </span>
+            <span
+              className="hidden sm:inline-block text-[9.5px] border border-border/60 px-1.5 py-0.5 rounded text-muted-foreground/45"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              β
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span
+              className="hidden md:block text-xs text-muted-foreground/40"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              provenance-first cultural storytelling
+            </span>
+            <button
+              onClick={() => setIsDark((d) => !d)}
+              className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {isDark ? (
+                <Sun className="w-3.5 h-3.5" />
+              ) : (
+                <Moon className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Main layout ─────────────────────────────────────────────────────── */}
+      <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-6 lg:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] xl:grid-cols-[390px_1fr] gap-5 lg:gap-7">
+          {/* ── Left: Control panel ─────────────────────────────────────────── */}
+          <aside className="lg:sticky lg:top-[72px] lg:self-start space-y-4">
+            <div
+              className="rounded-xl border border-border/60 overflow-hidden"
+              style={{ backgroundColor: "var(--card)" }}
+            >
+              <div className="px-5 py-4 border-b border-border/40">
+                <h2
+                  className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-muted-foreground/50"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  Configure
+                </h2>
+              </div>
+
+              <div className="p-5 space-y-5">
+                {/* ── Mode toggle (3-way) ─────────────────────────────────── */}
+                <fieldset>
+                  <legend
+                    className="block text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted-foreground/60 mb-2"
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                  >
+                    Mode
+                  </legend>
+                  <div
+                    className="grid grid-cols-3 rounded-lg border border-border/60 p-0.5 gap-0.5"
+                    style={{
+                      backgroundColor:
+                        "color-mix(in srgb, var(--secondary) 20%, transparent)",
+                    }}
+                    role="group"
+                    aria-label="Story composition mode"
+                  >
+                    {MODE_DEFS.map(({ id, Icon, short, full }) => (
+                      <button
+                        key={id}
+                        onClick={() => setMode(id)}
+                        className="flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-md text-[11px] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-inset"
+                        style={{
+                          fontFamily: "'Inter', sans-serif",
+                          backgroundColor:
+                            mode === id ? "var(--primary)" : "transparent",
+                          color:
+                            mode === id
+                              ? "var(--primary-foreground)"
+                              : "var(--muted-foreground)",
+                        }}
+                        aria-pressed={mode === id}
+                        title={full}
+                      >
+                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="hidden sm:block truncate w-full text-center leading-tight">
+                          {full}
+                        </span>
+                        <span className="sm:hidden leading-tight">{short}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p
+                    className="mt-1.5 text-xs leading-relaxed"
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      color:
+                        "color-mix(in srgb, var(--muted-foreground) 55%, transparent)",
+                    }}
+                  >
+                    {MODE_DEFS.find((m) => m.id === mode)?.desc}
+                  </p>
+                </fieldset>
+
+                {/* ── Place ───────────────────────────────────────────────── */}
+                <div>
+                  <label
+                    className="block text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted-foreground/60 mb-2"
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                  >
+                    Place
+                  </label>
+                  <PlaceSelect value={place} onChange={setPlace} />
+                  {place === "Timbuktu Mali" && !isCinematic && (
+                    <p
+                      className="mt-1.5 text-xs"
+                      style={{
+                        fontFamily: "'Inter', sans-serif",
+                        color:
+                          "color-mix(in srgb, var(--primary) 70%, transparent)",
+                      }}
+                    >
+                      ↳ Refusal state will be demonstrated
+                    </p>
+                  )}
+                </div>
+
+                {/* ── Grounded / GenAI controls ────────────────────────────── */}
+                {!isCinematic && (
+                  <>
+                    <div>
+                      <label
+                        htmlFor="query-input"
+                        className="block text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted-foreground/60 mb-2"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        Theme · query
+                      </label>
+                      <input
+                        id="query-input"
+                        type="text"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="temple architecture and carvings"
+                        className="w-full px-3 py-2 rounded-lg border border-border text-sm text-foreground placeholder:text-muted-foreground/35 focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                        style={{
+                          fontFamily: "'Inter', sans-serif",
+                          backgroundColor:
+                            "color-mix(in srgb, var(--secondary) 30%, transparent)",
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <p
+                        className="text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted-foreground/60 mb-2"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        Story seeds
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {SEED_CHIPS.map((chip) => (
+                          <button
+                            key={chip}
+                            onClick={() => setQuery(chip)}
+                            className="text-xs px-2.5 py-1 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                            style={{
+                              fontFamily: "'Inter', sans-serif",
+                              borderColor:
+                                query === chip
+                                  ? "color-mix(in srgb, var(--primary) 40%, transparent)"
+                                  : "var(--border)",
+                              backgroundColor:
+                                query === chip
+                                  ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+                                  : "transparent",
+                              color:
+                                query === chip
+                                  ? "var(--primary)"
+                                  : "var(--muted-foreground)",
+                            }}
+                          >
+                            {chip}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <PhotoDropZone onPhotoSelect={setPhoto} photo={photo} />
+
+                    {photo && (
+                      <button
+                        onClick={() => setPhoto(null)}
+                        className="text-xs flex items-center gap-1 transition-colors focus:outline-none focus:ring-1 focus:ring-ring rounded -mt-2"
+                        style={{
+                          fontFamily: "'Inter', sans-serif",
+                          color:
+                            "color-mix(in srgb, var(--muted-foreground) 55%, transparent)",
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.color =
+                            "var(--muted-foreground)";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.color =
+                            "color-mix(in srgb, var(--muted-foreground) 55%, transparent)";
+                        }}
+                      >
+                        <span className="text-base leading-none">×</span>{" "}
+                        remove photo
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {/* ── Cinematic controls ───────────────────────────────────── */}
+                {isCinematic && (
+                  <>
+                    {/* Era chips */}
+                    <div>
+                      <p
+                        className="text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted-foreground/60 mb-2"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        Timeline · era
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {CINEMATIC_ERAS.map((era) => (
+                          <button
+                            key={era.id}
+                            onClick={() => setSelectedEra(era.id)}
+                            className="flex flex-col items-start px-2.5 py-1.5 rounded-lg border text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                            style={{
+                              fontFamily: "'Inter', sans-serif",
+                              borderColor:
+                                selectedEra === era.id
+                                  ? "color-mix(in srgb, var(--accent) 40%, transparent)"
+                                  : "var(--border)",
+                              backgroundColor:
+                                selectedEra === era.id
+                                  ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+                                  : "transparent",
+                            }}
+                            aria-pressed={selectedEra === era.id}
+                          >
+                            <span
+                              className="text-xs font-medium leading-tight"
+                              style={{
+                                color:
+                                  selectedEra === era.id
+                                    ? "var(--accent)"
+                                    : "var(--foreground)",
+                              }}
+                            >
+                              {era.label}
+                            </span>
+                            <span
+                              className="text-[9.5px] leading-tight"
+                              style={{
+                                fontFamily: "'JetBrains Mono', monospace",
+                                color:
+                                  "color-mix(in srgb, var(--muted-foreground) 60%, transparent)",
+                              }}
+                            >
+                              {era.range}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Narration style */}
+                    <ChipGroup
+                      label="Narration style"
+                      options={NARRATION_STYLES}
+                      value={narrationStyle}
+                      onChange={setNarrationStyle}
+                    />
+
+                    {/* Video style */}
+                    <ChipGroup
+                      label="Video style"
+                      options={VIDEO_STYLES}
+                      value={videoStyle}
+                      onChange={setVideoStyle}
+                    />
+
+                    {/* Duration */}
+                    <div>
+                      <p
+                        className="text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted-foreground/60 mb-2"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        Duration
+                      </p>
+                      <div className="flex gap-1.5">
+                        {DURATIONS.map((dur) => (
+                          <button
+                            key={dur}
+                            onClick={() => setVideoDuration(dur)}
+                            className="flex-1 py-1.5 px-2 rounded-lg border text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                            style={{
+                              fontFamily: "'JetBrains Mono', monospace",
+                              borderColor:
+                                videoDuration === dur
+                                  ? "color-mix(in srgb, var(--accent) 40%, transparent)"
+                                  : "var(--border)",
+                              backgroundColor:
+                                videoDuration === dur
+                                  ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+                                  : "transparent",
+                              color:
+                                videoDuration === dur
+                                  ? "var(--accent)"
+                                  : "var(--muted-foreground)",
+                            }}
+                            aria-pressed={videoDuration === dur}
+                          >
+                            {dur}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Cinematic photo zone */}
+                    <PhotoDropZone onPhotoSelect={setPhoto} photo={photo} />
+                    {photo && (
+                      <button
+                        onClick={() => setPhoto(null)}
+                        className="text-xs flex items-center gap-1 -mt-2 transition-colors focus:outline-none focus:ring-1 focus:ring-ring rounded"
+                        style={{
+                          fontFamily: "'Inter', sans-serif",
+                          color:
+                            "color-mix(in srgb, var(--muted-foreground) 55%, transparent)",
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.color =
+                            "var(--muted-foreground)";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.color =
+                            "color-mix(in srgb, var(--muted-foreground) 55%, transparent)";
+                        }}
+                      >
+                        <span className="text-base leading-none">×</span>{" "}
+                        remove photo
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Submit row */}
+              <div className="px-5 pb-5 flex gap-2">
+                <button
+                  onClick={handleSubmit}
+                  disabled={!canSubmit}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    backgroundColor: isCinematic
+                      ? "var(--accent)"
+                      : "var(--primary)",
+                    color: isCinematic
+                      ? "var(--accent-foreground)"
+                      : "var(--primary-foreground)",
+                  }}
+                  aria-busy={isGenerating}
+                >
+                  {appState === "loading" ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Grounding…
+                    </span>
+                  ) : appState === "cinematic-gen" ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Generating…
+                    </span>
+                  ) : isCinematic ? (
+                    <span className="flex items-center justify-center gap-1.5">
+                      <Film className="w-3.5 h-3.5" />
+                      Generate cinematic story
+                    </span>
+                  ) : (
+                    "Compose story"
+                  )}
+                </button>
+
+                {appState !== "idle" && (
+                  <button
+                    onClick={handleReset}
+                    className="w-10 h-10 rounded-lg border border-border/60 flex items-center justify-center text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                    aria-label="Reset to empty state"
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.borderColor =
+                        "color-mix(in srgb, var(--primary) 35%, transparent)";
+                      (e.currentTarget as HTMLElement).style.color =
+                        "var(--foreground)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.borderColor = "";
+                      (e.currentTarget as HTMLElement).style.color = "";
+                    }}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Grounding / Cinematic note */}
+            <div
+              className="rounded-lg border px-4 py-3"
+              style={{
+                borderColor: isCinematic
+                  ? "color-mix(in srgb, var(--accent) 15%, transparent)"
+                  : "color-mix(in srgb, var(--primary) 15%, transparent)",
+                backgroundColor: isCinematic
+                  ? "color-mix(in srgb, var(--accent) 4%, transparent)"
+                  : "color-mix(in srgb, var(--primary) 4%, transparent)",
+              }}
+            >
+              <p
+                className="text-xs leading-relaxed"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  color:
+                    "color-mix(in srgb, var(--muted-foreground) 75%, transparent)",
+                }}
+              >
+                {isCinematic ? (
+                  <>
+                    <span
+                      className="font-semibold"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      Cinematic mode
+                    </span>{" "}
+                    generates imaginative AI narratives with synthetic voice and
+                    AI-composed video scenes. No source verification is applied.
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className="font-semibold"
+                      style={{ color: "var(--primary)" }}
+                    >
+                      Kathakaar
+                    </span>{" "}
+                    only asserts what its ten-place source corpus can verify.
+                    Every sentence carries a citation. Unsupported claims are
+                    dropped, not softened.
+                  </>
+                )}
+              </p>
+            </div>
+          </aside>
+
+          {/* ── Right: Story canvas ─────────────────────────────────────────── */}
+          <main
+            className="rounded-xl border border-border/60 flex flex-col overflow-hidden"
+            style={{
+              backgroundColor: "var(--card)",
+              minHeight: "clamp(480px, 70vh, 900px)",
+            }}
+            aria-live="polite"
+            aria-label="Story canvas"
+          >
+            {appState === "idle" && <EmptyState />}
+
+            {appState === "loading" && <LoadingSkeleton place={place} />}
+
+            {appState === "cinematic-gen" && (
+              <CinematicGenProgress currentStep={genStep} />
+            )}
+
+            {appState === "cinematic-done" && cinematicData && (
+              <CinematicOutput data={cinematicData} />
+            )}
+
+            {appState === "refusal" && storyData && (
+              <RefusalCard reason={storyData.reason!} />
+            )}
+
+            {showStory && storyData && (
+              <div className="flex flex-col flex-1">
+                {/* Photo identification banner */}
+                {appState === "photo" && storyData.identified_place && (
+                  <div
+                    className="flex items-center gap-2.5 px-5 sm:px-6 py-3 border-b shrink-0"
+                    style={{
+                      backgroundColor:
+                        "color-mix(in srgb, var(--accent) 9%, transparent)",
+                      borderColor:
+                        "color-mix(in srgb, var(--accent) 20%, transparent)",
+                    }}
+                    role="status"
+                    aria-label={`Photo identified as ${storyData.identified_place}`}
+                  >
+                    <Camera
+                      className="w-4 h-4 shrink-0"
+                      style={{ color: "var(--accent)" }}
+                    />
+                    <p
+                      className="text-sm font-medium"
+                      style={{
+                        fontFamily: "'Inter', sans-serif",
+                        color: "var(--accent)",
+                      }}
+                    >
+                      Identified:{" "}
+                      <span className="font-semibold">
+                        {storyData.identified_place}
+                      </span>
+                    </p>
+                    <span
+                      className="ml-auto text-[10px]"
+                      style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        color:
+                          "color-mix(in srgb, var(--accent) 55%, transparent)",
+                      }}
+                    >
+                      vision · confirmed
+                    </span>
+                  </div>
+                )}
+
+                {/* Score header */}
+                <div className="px-5 sm:px-7 pt-6 pb-5 border-b border-border/40 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                  <GroundingMeter score={storyData.grounding_score!} />
+                  <div className="sm:ml-auto flex flex-col gap-2 items-start sm:items-end">
+                    <ModeBadge mode={storyData.mode!} />
+                    <span
+                      className="text-xs text-muted-foreground/60"
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      {storyData.place}
+                    </span>
+                    {storyData.removed_claims &&
+                    storyData.removed_claims > 0 ? (
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-md border"
+                        style={{
+                          fontFamily: "'Inter', sans-serif",
+                          backgroundColor:
+                            "color-mix(in srgb, #F43F5E 8%, transparent)",
+                          borderColor:
+                            "color-mix(in srgb, #F43F5E 20%, transparent)",
+                          color: "#FDA4AF",
+                        }}
+                      >
+                        {storyData.removed_claims} claim
+                        {storyData.removed_claims > 1 ? "s" : ""} removed
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Story text */}
+                <div className="px-5 sm:px-7 py-7 flex-1">
+                  <CitedStory
+                    story={storyData.story!}
+                    citations={storyData.citations!}
+                  />
+                </div>
+
+                {/* Provenance + Retrieved */}
+                <div
+                  className="px-5 sm:px-7 pb-7 pt-5 border-t border-border/40 space-y-7"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  <ProvenanceList citations={storyData.citations!} />
+                  <RetrievedChips retrieved={storyData.retrieved!} />
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+}

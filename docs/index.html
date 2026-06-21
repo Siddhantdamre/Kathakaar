@@ -246,7 +246,12 @@
 
 <script>
 const $=s=>document.querySelector(s);
-const api=(p,o)=>fetch(p,o).then(r=>{if(!r.ok)throw 0;return r.json();});
+/* To run the live backend from this static page, set API_BASE to your
+   deployed URL, e.g. "https://kathakaar.onrender.com" (no trailing slash).
+   Leave it "" to use same-origin (when FastAPI serves this page) or the
+   built-in demo fallback (on GitHub Pages with no backend). */
+const API_BASE = (window.KATHAKAAR_API || "").replace(/\/$/, "");
+const api=(p,o)=>fetch(API_BASE+p,o).then(r=>{if(!r.ok)throw 0;return r.json();});
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let MODE='grounded', IMG=null, DEMO=false;
 
@@ -271,9 +276,32 @@ const DEMO_STORIES={
     unsupported:["It is said that the emperor blinded his architects so they could never build its equal."],
     retrieved:[{title:"Taj Mahal",score:7.5}]}
 };
-function demoStory(place,mode){
+/* client-side topic-relevance gate — mirrors the server so the live demo
+   refuses off-topic / invented themes instead of returning canned facts. */
+const DEMO_STOP=new Set(["the","and","its","was","were","for","with","into","near","they","their","this","that","from","are","has","have","had","which","who","about","tell","story","place"]);
+const DEMO_COMMON=new Set(["world","site","heritage","unesco","century","history","famous"]);
+function demoStem(w){ if(w.length>3&&w.endsWith("s"))w=w.slice(0,-1); if(w.length>5&&w.endsWith("ing"))w=w.slice(0,-3); else if(w.length>4&&w.endsWith("ed"))w=w.slice(0,-2); return w; }
+function demoTerms(t){ return new Set((String(t||"").toLowerCase().match(/[a-z0-9]+/g)||[]).filter(w=>w.length>2&&!DEMO_STOP.has(w)).map(demoStem)); }
+const DEMO_VOCAB=(()=>{const v=new Set();for(const k in DEMO_STORIES){demoTerms(DEMO_STORIES[k].story).forEach(x=>v.add(x));}return v;})();
+function demoGate(place,query){
+  const raw=String(query||"").trim();
+  if(!raw||raw.toLowerCase()==="history") return null;           // generic "tell me about it"
+  const supported=demoTerms(DEMO_STORIES[place].story);
+  const topic=[...demoTerms(raw)].filter(w=>!DEMO_COMMON.has(w));
+  if(!topic.length) return null;
+  if(topic.some(w=>supported.has(w))) return null;               // at least one supported term
+  const inCorpus=topic.some(w=>DEMO_VOCAB.has(w));
+  return {accepted:false,place,reason: inCorpus
+    ? `No source for '${place}' covers '${raw}'. Kathakaar only narrates what its sources can prove.`
+    : "None of the requested topics appear in any source. Kathakaar will not invent unsupported content."};
+}
+function demoStory(place,mode,query){
   if(mode==='genai') return JSON.parse(JSON.stringify(DEMO_STORIES["__genai__"]));
-  if(place && DEMO_STORIES[place]) return JSON.parse(JSON.stringify(DEMO_STORIES[place]));
+  if(place && DEMO_STORIES[place]){
+    const refusal=demoGate(place,query);
+    if(refusal) return refusal;
+    return JSON.parse(JSON.stringify(DEMO_STORIES[place]));
+  }
   if(place) return {accepted:false,reason:`The library has no grounded sources for '${place}'.`};
   return JSON.parse(JSON.stringify(DEMO_STORIES["Hampi, India"]));
 }
@@ -372,7 +400,7 @@ async function go(){
   await new Promise(r=>setTimeout(r,DEMO?520:0));
   try{
     let d;
-    if(DEMO){ d=demoStory(place,MODE); }
+    if(DEMO){ d=demoStory(place,MODE,query); }
     else if(IMG){ const fd=new FormData(); fd.append('image',IMG); fd.append('query',query); fd.append('mode',MODE);
       d=await api('/api/story-image',{method:'POST',body:fd}); }
     else d=await api('/api/story',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query,place:place||null,mode:MODE})});
