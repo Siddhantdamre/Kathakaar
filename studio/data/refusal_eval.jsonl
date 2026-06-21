@@ -1,0 +1,29 @@
+{"query":"Vijayanagara empire and the river","place":"Hampi, India","expect":"accept","kind":"on_topic"}
+{"query":"stone chariot temple","place":"Hampi, India","expect":"accept","kind":"on_topic"}
+{"query":"marble mausoleum and gardens","place":"Agra, India","expect":"accept","kind":"on_topic"}
+{"query":"Mughal architecture","place":"Agra, India","expect":"accept","kind":"on_topic"}
+{"query":"Islamic learning and manuscripts","place":"Timbuktu, Mali","expect":"accept","kind":"on_topic"}
+{"query":"carved stone wheels chariot","place":"Konark, India","expect":"accept","kind":"on_topic"}
+{"query":"rock-cut temples and the shore","place":"Mahabalipuram, India","expect":"accept","kind":"on_topic"}
+{"query":"carved granite relief","place":"Mahabalipuram, India","expect":"accept","kind":"on_topic"}
+{"query":"nagara architecture and sculpture","place":"Khajuraho, India","expect":"accept","kind":"on_topic"}
+{"query":"temple carvings","place":"Khajuraho, India","expect":"accept","kind":"on_topic"}
+{"query":"Khmer temple complex and Vishnu","place":"Siem Reap, Cambodia","expect":"accept","kind":"on_topic"}
+{"query":"Nabataean sandstone treasury","place":"Petra, Jordan","expect":"accept","kind":"on_topic"}
+{"query":"Inca citadel and stone walls","place":"Cusco Region, Peru","expect":"accept","kind":"on_topic"}
+{"query":"great wall fortifications Ming","place":"Beijing, China","expect":"accept","kind":"on_topic"}
+{"query":"","place":"Konark, India","expect":"accept","kind":"generic"}
+{"query":"history","place":"Hampi, India","expect":"accept","kind":"generic"}
+{"query":"tell me about this","place":"Petra, Jordan","expect":"accept","kind":"generic"}
+{"query":"alien spaceships and lasers","place":"Konark, India","expect":"refuse","kind":"invention"}
+{"query":"dinosaurs and volcanoes","place":"Agra, India","expect":"refuse","kind":"invention"}
+{"query":"cryptocurrency mining rigs","place":"Petra, Jordan","expect":"refuse","kind":"invention"}
+{"query":"football world cup final","place":"Beijing, China","expect":"refuse","kind":"invention"}
+{"query":"robot uprising and drones","place":"Hampi, India","expect":"refuse","kind":"invention"}
+{"query":"a secret underground casino","place":"Khajuraho, India","expect":"refuse","kind":"invention"}
+{"query":"marble mausoleum","place":"Konark, India","expect":"refuse","kind":"wrong_place"}
+{"query":"Inca citadel","place":"Petra, Jordan","expect":"refuse","kind":"wrong_place"}
+{"query":"great wall fortifications","place":"Agra, India","expect":"refuse","kind":"wrong_place"}
+{"query":"Nabataean treasury","place":"Hampi, India","expect":"refuse","kind":"wrong_place"}
+{"query":"manuscripts and the mosque","place":"Beijing, China","expect":"refuse","kind":"wrong_place"}
+{"query":"Khmer Buddhist monument","place":"Cusco Region, Peru","expect":"refuse","kind":"wrong_place"}

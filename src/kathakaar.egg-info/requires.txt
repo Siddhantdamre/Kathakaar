@@ -1,0 +1,13 @@
+
+[dev]
+mypy>=1.10
+pytest>=8.2
+ruff>=0.5
+
+[multimodal]
+pillow>=10.4
+torch>=2.3
+transformers>=4.45
+
+[production]
+psycopg[binary]>=3.2
