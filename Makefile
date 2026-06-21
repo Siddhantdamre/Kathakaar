@@ -24,3 +24,6 @@ evaluate:
 	$(PYTHON) -m kathakaar kb-audit
 	$(PYTHON) -m kathakaar fit-multimodal
 	$(PYTHON) -m kathakaar validate-multimodal --queries benchmarks/multimodal_v3/queries.jsonl --model artifacts/multimodal_v3.json --output results/multimodal_v3/evaluation.json
+
+demo:
+	@python scripts/demo.py
