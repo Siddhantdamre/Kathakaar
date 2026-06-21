@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from . import genai
 from .grounding import Source
 from .story import StoryEngine
+from . import cinematic
 
 BASE = Path(__file__).resolve().parent.parent
 WEB = BASE / "web"
@@ -51,6 +52,14 @@ class StoryRequest(BaseModel):
     mode: str = "grounded"  # "grounded" | "genai"
 
 
+class CinematicRequest(BaseModel):
+    query: str = ""
+    place: str | None = None
+    year: int = 1300
+    format: str = "oral"
+    duration_secs: int = 60
+
+
 from fastapi import Request as _Request
 from fastapi.responses import JSONResponse as _JSONResponse
 from fastapi.exceptions import RequestValidationError as _RVE
@@ -73,7 +82,14 @@ def health() -> dict:
 
 @app.get("/api/config")
 def config() -> dict:
-    return {"genai": genai.status(), "places": sorted({s.place for s in SOURCES})}
+    return {
+        "genai": genai.status(),
+        "places": sorted({s.place for s in SOURCES}),
+        "formats": [
+            {"id": k, "label": v["label"], "origin": v["origin"]}
+            for k, v in cinematic.FORMATS.items()
+        ],
+    }
 
 
 @app.get("/api/places")
@@ -84,6 +100,14 @@ def places() -> dict:
 @app.post("/api/story")
 def story(req: StoryRequest) -> dict:
     return ENGINE.compose(req.query, req.place, mode=req.mode)
+
+
+@app.post("/api/cinematic")
+def cinematic_story(req: CinematicRequest) -> dict:
+    """Build a narrated, scene-by-scene cinematic manifest from grounded sources."""
+    return cinematic.build_manifest(
+        ENGINE, req.query, req.place, req.year, req.format, req.duration_secs,
+    )
 
 
 @app.post("/api/story-image")

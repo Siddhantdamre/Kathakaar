@@ -82,3 +82,49 @@ export async function postStoryImage(
   });
   return normalize(await r.json());
 }
+
+// ── Cinematic (narrated, animated mini-documentary) ─────────────────────────
+export interface CinematicScene {
+  index: number;
+  title: string;
+  narration: string;
+  caption: string;
+  duration_ms: number;
+  visual_note: string;
+}
+export interface CinematicManifest {
+  accepted: boolean;
+  title?: string;
+  place?: string;
+  theme?: string;
+  era?: string;
+  year?: number;
+  format?: string;
+  format_label?: string;
+  format_origin?: string;
+  grounded?: boolean;
+  voice?: { rate: number; pitch: number };
+  citations?: { n: number; title: string; url: string }[];
+  scenes?: CinematicScene[];
+  reason?: string;
+}
+export interface StoryFormat { id: string; label: string; origin: string }
+
+export async function getFormats(): Promise<StoryFormat[]> {
+  const cfg = await getConfig();
+  return (cfg as any)?.formats ?? [];
+}
+
+export async function postCinematic(args: {
+  query: string; place: string | null; year: number; format: string; duration_secs?: number;
+}): Promise<CinematicManifest> {
+  const r = await fetch(`${API_BASE}/api/cinematic`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query: args.query, place: args.place || null, year: args.year,
+      format: args.format, duration_secs: args.duration_secs ?? 60,
+    }),
+  });
+  return await r.json();
+}

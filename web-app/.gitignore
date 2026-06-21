@@ -3,4 +3,5 @@ dist/
 .env
 .env.local
 *.local
-.DS_Store
+.DS_S*.bak
+*.tmp
