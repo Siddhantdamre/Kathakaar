@@ -42,3 +42,32 @@ later without changing the UI:
 
 This is a real-money, minutes-per-clip pipeline — wire it when you have keys and
 a storage bucket. The current free version is what ships on Vercel + Render today.
+
+---
+
+## Update — any place on Earth, no refusals (Cinematic)
+
+Cinematic no longer limits you to the 10-place corpus, and never hard-refuses.
+Data resolution order in `studio/app/cinematic.py`:
+
+1. **Local grounded corpus** (cinematic mode relaxes the strict topic gate, so a
+   corpus place like Konark always films — this fixes the earlier
+   "declined to film this" bug, which was the strict gate running on a short blurb).
+2. **Wikipedia REST API** (`studio/app/wiki.py`, no API key) — resolves ANY place
+   on Earth to a real, citable article + a real image (`image_url` on the manifest,
+   used as the player's background).
+3. **Imaginative fallback** — a clearly-labelled "Imaginative retelling" so the
+   user always gets a film, even if Wikipedia has nothing.
+
+Frontend: the Place field is now a free-text combobox (type any place; the 10
+corpus places remain as suggestions), and Cinematic has its own **Theme** field
+so the story follows the theme.
+
+Note: **Grounded mode is unchanged** — it still refuses ungrounded requests (that
+provenance guarantee is the portfolio centrepiece). Only **Cinematic** is
+no-refusal, because its job is to always tell a story.
+
+Verified: backend manifest logic tested for corpus / mocked-Wikipedia / fallback;
+frontend builds clean (2068 modules). The live Wikipedia call runs server-side on
+Render (this build sandbox blocks outbound Wikipedia, so it was validated with a
+mock matching Wikipedia's documented REST shape).

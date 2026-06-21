@@ -1692,7 +1692,7 @@ export default function App() {
       Icon: Film,
       short: "Film",
       full: "Cinematic",
-      desc: "Ungrounded AI narrative with voice and AI-generated video scenes.",
+      desc: "A narrated, animated retelling — grounded in cited sources, for any place on Earth.",
     },
   ];
 
@@ -1848,7 +1848,19 @@ export default function App() {
                   >
                     Place
                   </label>
-                  <PlaceSelect value={place} onChange={setPlace} />
+                  <input
+                    list="kth-places"
+                    value={place}
+                    onChange={(e) => setPlace(e.target.value)}
+                    placeholder="Type any place on Earth…"
+                    className="w-full px-3 py-2 rounded-lg border border-border text-sm text-foreground placeholder:text-muted-foreground/35 focus:outline-none focus:ring-2 focus:ring-ring transition-colors bg-transparent"
+                    aria-label="Place"
+                  />
+                  <datalist id="kth-places">
+                    {PLACES.map((p) => (
+                      <option key={p} value={p} />
+                    ))}
+                  </datalist>
                   {place === "Timbuktu Mali" && !isCinematic && (
                     <p
                       className="mt-1.5 text-xs"
@@ -1954,6 +1966,20 @@ export default function App() {
                 {/* ── Cinematic controls ───────────────────────────────────── */}
                 {isCinematic && (
                   <>
+                    {/* Theme (drives the story) */}
+                    <div>
+                      <p className="text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted-foreground/60 mb-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        Theme
+                      </p>
+                      <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="e.g. temples and trade, kings and conquest…"
+                        className="w-full px-3 py-2 rounded-lg border border-border text-sm text-foreground placeholder:text-muted-foreground/35 focus:outline-none focus:ring-2 focus:ring-ring transition-colors bg-transparent"
+                        aria-label="Story theme"
+                      />
+                    </div>
+
                     {/* Timeline slider (free-form year) */}
                     <div>
                       <p className="text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted-foreground/60 mb-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
