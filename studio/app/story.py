@@ -99,35 +99,33 @@ class StoryEngine:
         else:
             used_sources = [s for s, _ in hits]
 
-        # --- Topic-relevance gate -------------------------------------------------
-        # The place gate above only proves we have sources FOR the place. This gate
-        # proves the requested TOPIC is actually covered by those sources, instead
-        # of silently returning generic place facts for an unsupported request.
-        # Score only "informative" topic stems (drop the place name and
-        # near-ubiquitous corpus words, which carry no topical signal).
-        informative = (_stems(tokens(query)) - _stems(_city(place)) - _GENERIC) - self.common
-        place_vocab: set[str] = set()
-        for s in used_sources:
-            place_vocab |= _stems(tokens(s.text))
-        matched = informative & place_vocab
-        if informative and not matched:
-            if not (informative & self.vocab):
-                reason = ("None of the requested topics appear in any source. "
-                          "Kathakaar will not invent unsupported content.")
-            else:
-                reason = (f"No source for '{top_source.place}' covers "
-                          f"'{query.strip()}'. Kathakaar only narrates what its "
-                          "sources can prove.")
-            return {
-                "accepted": False, "reason": reason, "place": top_source.place,
-                "story": "", "grounding_score": 0.0, "relevance_score": 0.0,
-                "unsupported": [], "citations": [],
-                "retrieved": [{"title": s.title, "score": sc} for s, sc in hits],
-                "mode": "grounded",
-            }
-        relevance = round(len(matched) / len(informative), 3) if informative else 1.0
+       # --- Topic-relevance gate -------------------------------------------------
+        # Skip the strict relevance gate for cinematic mode to allow imaginative framing
+        if mode != "cinematic":
+            informative = (_stems(tokens(query)) - _stems(_city(place)) - _GENERIC) - self.common
+            place_vocab: set[str] = set()
+            for s in used_sources:
+                place_vocab |= _stems(tokens(s.text))
+            matched = informative & place_vocab
+            if informative and not matched:
+                if not (informative & self.vocab):
+                    reason = ("None of the requested topics appear in any source. "
+                              "Kathakaar will not invent unsupported content.")
+                else:
+                    reason = (f"No source for '{top_source.place}' covers "
+                              f"'{query.strip()}'. Kathakaar only narrates what its "
+                              "sources can prove.")
+                return {
+                    "accepted": False, "reason": reason, "place": top_source.place,
+                    "story": "", "grounding_score": 0.0, "relevance_score": 0.0,
+                    "unsupported": [], "citations": [],
+                    "retrieved": [{"title": s.title, "score": sc} for s, sc in hits],
+                    "mode": "grounded",
+                }
+            relevance = round(len(matched) / len(informative), 3) if informative else 1.0
+        else:
+            relevance = 1.0  # Cinematic mode assumes full relevance to user prompt
         # -------------------------------------------------------------------------
-
         if mode == "genai" and genai.available():
             gen = self._genai_story(full_query, top_source.place, used_sources)
             if gen is not None:

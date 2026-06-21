@@ -103,6 +103,7 @@ export interface CinematicManifest {
   format_label?: string;
   format_origin?: string;
   grounded?: boolean;
+  image_url?: string | null;
   voice?: { rate: number; pitch: number };
   citations?: { n: number; title: string; url: string }[];
   scenes?: CinematicScene[];
@@ -127,4 +128,44 @@ export async function postCinematic(args: {
     }),
   });
   return await r.json();
+}
+
+// ── Premium voice (ElevenLabs) + real-video render hook ─────────────────────
+export interface Capabilities {
+  tts: { available: boolean; provider?: string };
+  render: { available: boolean; provider?: string | null };
+}
+export async function getCapabilities(): Promise<Capabilities> {
+  const c = (await getConfig()) as any;
+  return {
+    tts: c?.tts ?? { available: false },
+    render: c?.render ?? { available: false },
+  };
+}
+// Returns an object-URL for premium MP3 narration, or null (→ use browser voice).
+export async function ttsBlobUrl(text: string, voiceId?: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${API_BASE}/api/tts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, voice_id: voiceId ?? null }),
+    });
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.includes("audio")) return null; // no key configured -> JSON response
+    return URL.createObjectURL(await r.blob());
+  } catch {
+    return null;
+  }
+}
+export async function startRender(manifest: CinematicManifest): Promise<any> {
+  const r = await fetch(`${API_BASE}/api/render`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ manifest }),
+  });
+  return r.json();
+}
+export async function getRender(id: string): Promise<any> {
+  const r = await fetch(`${API_BASE}/api/render/${id}`);
+  return r.json();
 }

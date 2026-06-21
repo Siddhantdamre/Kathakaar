@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Play, Pause, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Clapperboard, Loader2 } from "lucide-react";
 import type { CinematicManifest } from "./api";
+import { getCapabilities, ttsBlobUrl, startRender, getRender } from "./api";
 
 // Curated background imagery per place (Unsplash). If one fails to load, the
 // procedural canvas layer (particles + light + grain) still carries the scene.
@@ -39,13 +40,20 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
   const [muted, setMuted] = useState(false);
   const [imgOk, setImgOk] = useState(true);
   const [kb, setKb] = useState(false); // ken-burns toggle per scene
+  const [ttsOn, setTtsOn] = useState(false);
+  const [renderOn, setRenderOn] = useState(false);
+  const [rendering, setRendering] = useState(false);
+  const [renderMsg, setRenderMsg] = useState<string | null>(null);
 
   const playingRef = useRef(false);
   const mutedRef = useRef(false);
   const timerRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const urlRef = useRef<string | null>(null);
+  const ttsRef = useRef(false);
 
-  const imgUrl = imageFor(manifest.place);
+  const imgUrl = manifest.image_url || imageFor(manifest.place);
 
   // ── procedural canvas layer: golden particles + light sweep + grain ──────
   useEffect(() => {
@@ -118,9 +126,15 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
   }, []);
 
   // ── narration sequencing ─────────────────────────────────────────────────
+  const revokeUrl = () => {
+    if (urlRef.current) { URL.revokeObjectURL(urlRef.current); urlRef.current = null; }
+  };
   const stopAll = useCallback(() => {
     playingRef.current = false;
     if (speechOK) window.speechSynthesis.cancel();
+    const a = audioRef.current;
+    if (a) { a.pause(); a.onended = null; a.onerror = null; }
+    revokeUrl();
     if (timerRef.current) {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -144,7 +158,8 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
           playingRef.current = false;
         }
       };
-      if (speechOK && !mutedRef.current) {
+      const speakWeb = () => {
+        if (!speechOK) { timerRef.current = window.setTimeout(advance, scenes[i].duration_ms || 6000); return; }
         const u = new SpeechSynthesisUtterance(scenes[i].narration);
         u.rate = manifest.voice?.rate ?? 0.9;
         u.pitch = manifest.voice?.pitch ?? 1;
@@ -152,8 +167,24 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
         u.onend = advance;
         u.onerror = advance;
         window.speechSynthesis.speak(u);
-      } else {
+      };
+      if (mutedRef.current) {
         timerRef.current = window.setTimeout(advance, scenes[i].duration_ms || 6000);
+      } else if (ttsRef.current) {
+        ttsBlobUrl(scenes[i].narration).then((url) => {
+          if (!playingRef.current) { if (url) URL.revokeObjectURL(url); return; }
+          if (!url) { speakWeb(); return; }
+          revokeUrl();
+          urlRef.current = url;
+          const a = audioRef.current;
+          if (!a) { speakWeb(); return; }
+          a.src = url;
+          a.onended = advance;
+          a.onerror = () => speakWeb();
+          a.play().catch(() => speakWeb());
+        });
+      } else {
+        speakWeb();
       }
     },
     [scenes, manifest.voice, stopAll],
@@ -178,10 +209,35 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
     playFrom(0);
   };
 
+  const onRender = async () => {
+    setRendering(true);
+    setRenderMsg("Submitting render job…");
+    try {
+      const job = await startRender(manifest);
+      setRenderMsg(job.message || job.status);
+      if (job.status === "queued" && job.id) {
+        for (let k = 0; k < 3; k++) {
+          await new Promise((r) => setTimeout(r, 1500));
+          const st = await getRender(job.id);
+          setRenderMsg(st.message || st.status);
+          if (st.video_url) { setRenderMsg("Video ready."); break; }
+        }
+      }
+    } catch {
+      setRenderMsg("Render request failed (is the backend reachable?).");
+    }
+    setRendering(false);
+  };
+
   useEffect(() => () => stopAll(), [stopAll]); // cleanup on unmount
   useEffect(() => {
     mutedRef.current = muted;
   }, [muted]);
+
+  useEffect(() => {
+    getCapabilities().then((c) => { setTtsOn(c.tts.available); setRenderOn(c.render.available); }).catch(() => {});
+  }, []);
+  useEffect(() => { ttsRef.current = ttsOn; }, [ttsOn]);
 
   if (!manifest.accepted) {
     return (
@@ -209,7 +265,7 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
       >
         <Volume2 className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />
         <p className="text-xs leading-snug" style={{ color: "color-mix(in srgb, var(--accent) 82%, transparent)" }}>
-          <span className="font-semibold">Grounded retelling</span> — narrated from cited
+          <span className="font-semibold">{manifest.grounded === false ? "Imaginative retelling" : "Grounded retelling"}</span> — narrated from cited
           sources in the <span className="font-semibold">{manifest.format_label}</span> form
           {!speechOK && " · (enable a Chrome/Edge browser for voice)"}
         </p>
@@ -347,6 +403,28 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
           )}
         </div>
       </div>
+
+      {/* premium voice status + real-video render hook */}
+      <div className="px-5 sm:px-6 pb-5 flex items-center gap-2 flex-wrap">
+        <button
+          onClick={onRender}
+          disabled={rendering}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs"
+          style={{ borderColor: "var(--border)", color: "var(--foreground)", opacity: rendering ? 0.6 : 1 }}
+        >
+          {rendering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clapperboard className="w-3.5 h-3.5" />}
+          Render real video{renderOn ? "" : " (beta)"}
+        </button>
+        {ttsOn && (
+          <span className="text-[10px] px-2 py-1 rounded" style={{ fontFamily: "'JetBrains Mono', monospace", backgroundColor: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)" }}>
+            premium voice on
+          </span>
+        )}
+        {renderMsg && (
+          <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{renderMsg}</span>
+        )}
+      </div>
+      <audio ref={audioRef} className="hidden" />
 
       <style>{`@keyframes kthFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </div>

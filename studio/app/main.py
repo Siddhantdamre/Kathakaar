@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.responses import Response as _Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -12,7 +13,7 @@ from pydantic import BaseModel
 from . import genai
 from .grounding import Source
 from .story import StoryEngine
-from . import cinematic
+from . import cinematic, tts, render
 
 BASE = Path(__file__).resolve().parent.parent
 WEB = BASE / "web"
@@ -89,6 +90,8 @@ def config() -> dict:
             {"id": k, "label": v["label"], "origin": v["origin"]}
             for k, v in cinematic.FORMATS.items()
         ],
+        "tts": {"available": tts.available(), "provider": "elevenlabs"},
+        "render": {"available": render.available(), "provider": render.provider()},
     }
 
 
@@ -108,6 +111,39 @@ def cinematic_story(req: CinematicRequest) -> dict:
     return cinematic.build_manifest(
         ENGINE, req.query, req.place, req.year, req.format, req.duration_secs,
     )
+
+
+class TTSRequest(BaseModel):
+    text: str
+    voice_id: str | None = None
+
+
+@app.post("/api/tts")
+def tts_endpoint(req: TTSRequest):
+    """Premium narration (ElevenLabs) when configured; else 200 JSON so the
+    frontend falls back to the browser voice."""
+    audio = tts.synthesize(req.text, req.voice_id)
+    if audio is None:
+        return _JSONResponse(status_code=200, content={
+            "available": False,
+            "reason": "TTS not configured (set ELEVENLABS_API_KEY).",
+        })
+    return _Response(content=audio, media_type="audio/mpeg")
+
+
+class RenderRequest(BaseModel):
+    manifest: dict
+
+
+@app.post("/api/render")
+def render_start(req: RenderRequest) -> dict:
+    """Kick off real video generation (Veo/Runway/Luma) when configured."""
+    return render.start(req.manifest)
+
+
+@app.get("/api/render/{job_id}")
+def render_status(job_id: str) -> dict:
+    return render.status(job_id)
 
 
 @app.post("/api/story-image")
