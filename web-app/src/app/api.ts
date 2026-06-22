@@ -104,6 +104,7 @@ export interface CinematicManifest {
   format_origin?: string;
   grounded?: boolean;
   image_url?: string | null;
+  video_url?: string | null;
   voice?: { rate: number; pitch: number };
   citations?: { n: number; title: string; url: string }[];
   scenes?: CinematicScene[];
