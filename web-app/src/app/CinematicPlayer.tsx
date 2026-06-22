@@ -3,32 +3,14 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Clapperboard, Loader2 } from 
 import type { CinematicManifest } from "./api";
 import { getCapabilities, ttsBlobUrl, startRender, getRender } from "./api";
 
-// Curated background imagery per place (Unsplash). If one fails to load, the
-// procedural canvas layer (particles + light + grain) still carries the scene.
-const PLACE_IMAGE: Record<string, string> = {
-  konark: "1565967511849-76a60a516170",
-  hampi: "1605649487212-47bdab064df7",
-  agra: "1564507592333-c60657eea523",
-  khajuraho: "1602308860324-7af9bd1a9f9e",
-  mahabalipuram: "1582510003544-4d00b7f74220",
-  petra: "1563177978-4c5ddccc5d3f",
-  angkor: "1599708153386-62bf3f035c0e",
-  "siem reap": "1599708153386-62bf3f035c0e",
-  beijing: "1508804185872-d7badad00f7d",
-  cusco: "1526392060635-9d6019884377",
-  timbuktu: "1568322445389-f64ac2515020",
+// Format → accent colour for the cinematic overlay (visible style difference per tradition)
+const FORMAT_COLOUR: Record<string, string> = {
+  oral:   "rgba(232,176,75,0.08)",
+  griot:  "rgba(180,100,40,0.10)",
+  ballad: "rgba(80,120,200,0.10)",
+  koan:   "rgba(120,180,140,0.08)",
+  myth:   "rgba(100,60,180,0.10)",
 };
-
-function imageFor(place?: string): string | null {
-  if (!place) return null;
-  const key = place.toLowerCase().split(",")[0].trim();
-  for (const k of Object.keys(PLACE_IMAGE)) {
-    if (key.includes(k) || k.includes(key)) {
-      return `https://images.unsplash.com/photo-${PLACE_IMAGE[k]}?w=1600&q=80&auto=format&fit=crop`;
-    }
-  }
-  return null;
-}
 
 const speechOK =
   typeof window !== "undefined" && "speechSynthesis" in window;
@@ -52,8 +34,12 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
   const ttsRef = useRef(false);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
 
-  const imgUrl = manifest.image_url || imageFor(manifest.place);
+  // Use only the server-resolved Wikipedia image (fetched server-side on Render —
+  // no hotlink blocking). Direct Unsplash hotlinks fail in production without a key.
+  const imgUrl = manifest.image_url || null;
+  const formatColour = FORMAT_COLOUR[manifest.format ?? "oral"] ?? FORMAT_COLOUR.oral;
 
   // ── procedural canvas layer: golden particles + light sweep + grain ──────
   useEffect(() => {
@@ -164,6 +150,12 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
         u.rate = manifest.voice?.rate ?? 0.9;
         u.pitch = manifest.voice?.pitch ?? 1;
         u.lang = "en-IN";
+        const en = voicesRef.current.filter((v) => v.lang && v.lang.toLowerCase().startsWith("en"));
+        if (en.length) {
+          const order = ["oral", "griot", "ballad", "koan", "myth"];
+          const fi = Math.max(0, order.indexOf(manifest.format || "oral"));
+          u.voice = en[fi % en.length];
+        }
         u.onend = advance;
         u.onerror = advance;
         window.speechSynthesis.speak(u);
@@ -238,6 +230,13 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
     getCapabilities().then((c) => { setTtsOn(c.tts.available); setRenderOn(c.render.available); }).catch(() => {});
   }, []);
   useEffect(() => { ttsRef.current = ttsOn; }, [ttsOn]);
+  useEffect(() => {
+    if (!speechOK) return;
+    const load = () => { voicesRef.current = window.speechSynthesis.getVoices(); };
+    load();
+    window.speechSynthesis.onvoiceschanged = load;
+    return () => { window.speechSynthesis.onvoiceschanged = null; };
+  }, []);
 
   if (!manifest.accepted) {
     return (
@@ -275,8 +274,20 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
         <div className="p-5 sm:p-6 pb-0">
           {/* ── the stage ── */}
           <div className="relative rounded-xl overflow-hidden bg-black" style={{ aspectRatio: "16/9" }}>
-            {/* Ken Burns image layer */}
-            {imgUrl && imgOk && (
+            {/* Real moving-video background (Pexels) when available */}
+            {manifest.video_url && (
+              <video
+                src={manifest.video_url}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ opacity: 0.82 }}
+              />
+            )}
+            {/* Ken Burns image layer (fallback when no video) */}
+            {!manifest.video_url && imgUrl && imgOk && (
               <img
                 src={imgUrl}
                 alt={manifest.place}
@@ -290,7 +301,7 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
                 }}
               />
             )}
-            {!imgOk || !imgUrl ? (
+            {!manifest.video_url && (!imgOk || !imgUrl) ? (
               <div
                 className="absolute inset-0"
                 style={{
@@ -302,6 +313,9 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
 
             {/* procedural particle / light / grain layer */}
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
+
+            {/* per-format colour wash — makes tradition switch visually distinct */}
+            <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: formatColour, transition: "background-color 1s ease" }} />
 
             {/* gradient for text legibility */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-black/45" />
@@ -334,7 +348,7 @@ export function CinematicPlayer({ manifest }: { manifest: CinematicManifest }) {
                   animation: "kthFade 900ms ease",
                 }}
               >
-                {scene?.caption}
+                {scene?.narration}
               </p>
             </div>
 

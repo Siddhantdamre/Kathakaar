@@ -15,34 +15,34 @@ import re
 
 from .grounding import split_sentences, tokens
 from .story import StoryEngine, _city
-from . import wiki
+from . import wiki, pexels
 
 FORMATS: dict[str, dict] = {
     "oral": {"label": "Oral Tradition", "origin": "Global · Indigenous",
              "opening": "Gather close, and listen well.",
              "connector": "And so it came to pass that",
              "close": "And that is how the story is remembered.",
-             "voice": {"rate": 0.93, "pitch": 1.0}},
+             "voice": {"rate": 1.0, "pitch": 1.0}},
     "griot": {"label": "Griot", "origin": "West Africa",
               "opening": "Hear now the griot, keeper of names and of years.",
               "connector": "Remember also that",
               "close": "The names are kept. The telling endures.",
-              "voice": {"rate": 0.88, "pitch": 0.9}},
+              "voice": {"rate": 0.8, "pitch": 0.7}},
     "ballad": {"label": "Epic Ballad", "origin": "Europe · South Asia",
                "opening": "Sing, O memory, of stone and of kings.",
                "connector": "And still the song rises, for",
                "close": "So ends the verse, but not the glory.",
-               "voice": {"rate": 0.85, "pitch": 1.05}},
+               "voice": {"rate": 1.1, "pitch": 1.25}},
     "koan": {"label": "Koan / Parable", "origin": "East Asia",
              "opening": "Consider one question, and let it open slowly.",
              "connector": "Now sit with this:",
              "close": "The question remains, and that is the answer.",
-             "voice": {"rate": 0.8, "pitch": 1.0}},
+             "voice": {"rate": 0.72, "pitch": 1.05}},
     "myth": {"label": "Mythic Cycle", "origin": "Norse · Hellenic",
              "opening": "In an age the world has half-forgotten,",
              "connector": "Thus the fates decreed that",
              "close": "And the cycle turns, as all cycles must.",
-             "voice": {"rate": 0.86, "pitch": 0.95}},
+             "voice": {"rate": 0.9, "pitch": 0.6}},
 }
 
 _SCENE_TITLES = ["The Opening", "The Turning", "The Height", "The Remembrance", "The Coda"]
@@ -118,6 +118,25 @@ def build_manifest(engine: StoryEngine, query: str, place: str | None,
             image = w.get("image")
             place_label = w["title"]
 
+    # Always resolve a real background image for the place (place-driven backdrop),
+    # even when the narration text came from the local corpus.
+    if image is None and place:
+        try:
+            w_img = fetch_fn(place)
+            if w_img:
+                image = w_img.get("image")
+        except Exception:
+            pass
+
+    # Optional: real moving-video background (Pexels) keyed by place + theme.
+    video_url = None
+    if pexels.available():
+        q = (f"{place or ''} {query or ''}").strip() or (place or "")
+        try:
+            video_url = pexels.video_for(q) or pexels.video_for(place or "")
+        except Exception:
+            video_url = None
+
     sentences = _theme_filter(sentences, query)
 
     # 3) never refuse — imaginative, clearly labelled
@@ -164,6 +183,7 @@ def build_manifest(engine: StoryEngine, query: str, place: str | None,
         "format_origin": form["origin"],
         "grounded": grounded,
         "image_url": image,
+        "video_url": video_url,
         "voice": form["voice"],
         "citations": citations,
         "scenes": scenes,

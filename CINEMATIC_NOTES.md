@@ -71,3 +71,21 @@ Verified: backend manifest logic tested for corpus / mocked-Wikipedia / fallback
 frontend builds clean (2068 modules). The live Wikipedia call runs server-side on
 Render (this build sandbox blocks outbound Wikipedia, so it was validated with a
 mock matching Wikipedia's documented REST shape).
+
+---
+
+## Update — real video backgrounds + distinct voices
+
+- **Moving video background**: set `PEXELS_API_KEY` (free at pexels.com/api) on
+  the backend. Cinematic then plays real MP4 footage matched to place+theme as
+  the background (manifest `video_url`); without the key it falls back to the
+  Ken Burns place image, then to the procedural layer. This is REAL footage, free.
+- **Distinct narration voices**: each storytelling form now uses a different
+  system voice (browser SpeechSynthesis) plus a wider rate/pitch spread, so
+  Griot (slow, deep) vs Epic Ballad (lively, higher) vs Koan (very slow) are
+  clearly different. Premium ElevenLabs voice still applies when `ELEVENLABS_API_KEY` is set.
+- **Bespoke AI-generated video** (a unique movie synthesized for the story) stays
+  the paid Veo/Runway/Luma path via `render.py` — that one needs a key + worker.
+
+Env vars summary: `PEXELS_API_KEY` (real video bg, free) · `ELEVENLABS_API_KEY`
+(premium voice) · `VEO_API_KEY`/`RUNWAY_API_KEY`/`LUMA_API_KEY` (true AI video).

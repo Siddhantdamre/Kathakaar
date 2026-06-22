@@ -2005,7 +2005,7 @@ export default function App() {
                       </p>
                       <select
                         value={storyFormat}
-                        onChange={(e) => setStoryFormat(e.target.value)}
+                        onChange={(e) => { setStoryFormat(e.target.value); if (appState === "cinematic-done") setAppState("idle"); }}
                         className="w-full rounded-lg border px-3 py-2 text-sm"
                         style={{ fontFamily: "'Inter', sans-serif", backgroundColor: "transparent", borderColor: "var(--border)", color: "var(--foreground)" }}
                         aria-label="Storytelling format"
@@ -2068,22 +2068,6 @@ export default function App() {
                         ))}
                       </div>
                     </div>
-
-                    {/* Narration style */}
-                    <ChipGroup
-                      label="Narration style"
-                      options={NARRATION_STYLES}
-                      value={narrationStyle}
-                      onChange={setNarrationStyle}
-                    />
-
-                    {/* Video style */}
-                    <ChipGroup
-                      label="Video style"
-                      options={VIDEO_STYLES}
-                      value={videoStyle}
-                      onChange={setVideoStyle}
-                    />
 
                     {/* Duration */}
                     <div>
