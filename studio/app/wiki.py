@@ -52,3 +52,23 @@ def fetch_place(place: str | None) -> dict | None:
            or f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title)}")
     return {"title": d.get("title", title), "extract": extract,
             "url": url, "image": image}
+
+
+_PAGEIMG = ("https://en.wikipedia.org/w/api.php?action=query&format=json"
+            "&prop=pageimages&piprop=original|thumbnail&pithumbsize=1200&titles={}")
+
+
+def image_by_title(title: str) -> str | None:
+    """Return the lead image URL for an EXACT Wikipedia article title (reliable —
+    no search ambiguity, no guessed filenames). Used for the curated corpus places."""
+    if not title:
+        return None
+    d = _get(_PAGEIMG.format(urllib.parse.quote(title)))
+    if not d:
+        return None
+    for pg in d.get("query", {}).get("pages", {}).values():
+        src = ((pg.get("original") or {}).get("source")
+               or (pg.get("thumbnail") or {}).get("source"))
+        if src:
+            return src
+    return None
