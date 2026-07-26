@@ -48,6 +48,22 @@ FORMATS: dict[str, dict] = {
 _SCENE_TITLES = ["The Opening", "The Turning", "The Height", "The Remembrance", "The Coda"]
 
 
+# Exact Wikipedia article titles for the 10 corpus places, so their background
+# image resolves reliably (no search ambiguity, no guessed filenames).
+CORPUS_IMAGE_TITLES = {
+    "konark": "Konark Sun Temple",
+    "hampi": "Hampi",
+    "agra": "Taj Mahal",
+    "khajuraho": "Khajuraho Group of Monuments",
+    "mahabalipuram": "Group of Monuments at Mahabalipuram",
+    "petra": "Petra",
+    "angkor": "Angkor Wat", "siem": "Angkor Wat", "reap": "Angkor Wat",
+    "beijing": "Great Wall of China",
+    "cusco": "Machu Picchu",
+    "timbuktu": "Timbuktu",
+}
+
+
 def era_label(year: int) -> str:
     if year < 0:
         return f"{abs(year)} BCE · Antiquity"
@@ -127,6 +143,16 @@ def build_manifest(engine: StoryEngine, query: str, place: str | None,
                 image = w_img.get("image")
         except Exception:
             pass
+
+    # Reliable fallback for the 10 curated corpus places: resolve their image by
+    # EXACT Wikipedia title (avoids the flaky search step so the stage is never blank).
+    if image is None and pc:
+        title = next((t for k, t in CORPUS_IMAGE_TITLES.items() if k in pc), None)
+        if title:
+            try:
+                image = wiki.image_by_title(title)
+            except Exception:
+                pass
 
     # Optional: real moving-video background (Pexels) keyed by place + theme.
     video_url = None
